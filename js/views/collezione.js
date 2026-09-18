@@ -13,7 +13,11 @@ Readda.Collezione = (function () {
 
   function disegna() {
     U = Readda.Ui; S = Readda.Store;
-    render();
+    var tutti = [];
+    ['passiva', 'ignota', 'attiva'].forEach(function (st) { tutti = tutti.concat(S.perStato(st)); });
+    if (!tutti.length) { render(); return; }
+    U.rendi('<div class="attesa"><span></span><span></span><span></span></div>');
+    Readda.Corpus.assicura(tutti, render);
   }
 
   function render() {
@@ -70,6 +74,8 @@ Readda.Collezione = (function () {
   function apri(id) {
     var l = U.lemmaPerId(id), p = S.parola(id);
     if (!l) return;
+    p = p || {};
+    p.usi = p.usi || []; p.ok = p.ok || 0; p.ko = p.ko || 0;
     var usi = p.usi.length
       ? '<div style="margin-top:22px"><span class="occhiello">Le tue frasi</span>' +
         p.usi.map(function (u) {
@@ -95,6 +101,9 @@ Readda.Collezione = (function () {
       '<p style="margin-top:22px;font-size:12.5px;color:var(--inchiostro-3)">' +
         (p.prox ? 'Prossimo ripasso ' + U.esc(U.quando(p.prox)) : 'Fuori dal ripasso') +
         ' · ' + p.ok + ' giuste, ' + p.ko + ' sbagliate</p>' +
+      (p.curato ? '' :
+        '<p style="margin-top:20px;font-size:11px;color:var(--inchiostro-4);line-height:1.5">' +
+        'Definizione dal Wikizionario italiano, CC BY-SA 3.0, con modifiche.</p>') +
       '<button class="btn btn-muto btn-pieno" id="togli" style="margin-top:18px">Toglila dalla raccolta</button>',
       function (foglioEl, chiudi) {
         foglioEl.querySelector('#togli').addEventListener('click', function () {

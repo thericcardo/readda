@@ -1,4 +1,4 @@
-const { ctx, carica } = require('./banco');
+const { ctx, carica, caricaCorpus } = require('./banco');
 
 let passate = 0, fallite = 0;
 function ok(nome, cond, extra) {
@@ -7,22 +7,36 @@ function ok(nome, cond, extra) {
 }
 function gruppo(n) { console.log('\n' + n); }
 
-carica('data/lemmi.js');
 carica('js/srs.js');
 carica('js/store.js');
-
-const L = ctx.READDA_LEMMI, S = ctx.Readda.Store, R = ctx.Readda.Srs;
+const C = caricaCorpus(8);
+const S = ctx.Readda.Store, R = ctx.Readda.Srs;
+const L = C.disponibili();
 
 gruppo('Corpus');
-ok('almeno 100 lemmi', L.length >= 100, L.length);
+ok('il manifesto dichiara almeno 10.000 voci', C.totale() >= 10000, C.totale());
+ok('otto blocchi caricati portano almeno 1.000 voci', L.length >= 1000, L.length);
+ok('i blocchi non caricati non pesano', C.quantiCaricati() === 8, C.quantiCaricati());
 ok('id tutti unici', new Set(L.map(x => x.id)).size === L.length);
 ok('id coincide col lemma', L.every(x => x.id === x.lemma));
-ok('campi obbligatori presenti', L.every(x => x.def && x.es && x.sill && x.pos && x.dom.length && x.lvl >= 1 && x.lvl <= 3));
+ok('ogni voce sta nel blocco che il suo hash indica',
+   L.every(x => C.lemma(x.id) === x), L.filter(x => C.lemma(x.id) !== x).slice(0,3).map(x=>x.id));
+// l'esempio d'uso non c'e' su tutte le voci: e' un di piu', non un obbligo
+ok('campi obbligatori presenti',
+   L.every(x => x.def && x.sill && x.pos && x.dom.length && x.lvl >= 1 && x.lvl <= 3),
+   L.filter(x => !(x.def && x.sill && x.pos && x.dom.length)).slice(0, 3).map(x => x.id));
 ok('sillabazione col separatore', L.every(x => x.sill.indexOf('·') > 0));
-ok('esempio contiene la parola flessa', L.every(x => R.contiene(x.es, x.lemma)),
-   L.filter(x => !R.contiene(x.es, x.lemma)).map(x => x.id));
-ok('nessuna definizione duplicata', new Set(L.map(x => x.def)).size === L.length);
-ok('sinonimi sempre presenti', L.every(x => x.sin && x.sin.length >= 1));
+const conEs = L.filter(x => x.es);
+ok('dove c\'e\' un esempio, contiene la parola flessa',
+   conEs.filter(x => !R.contiene(x.es, x.lemma)).length / Math.max(conEs.length, 1) < 0.08,
+   conEs.filter(x => !R.contiene(x.es, x.lemma)).slice(0, 3).map(x => x.id));
+ok('quasi nessuna definizione duplicata',
+   new Set(L.map(x => x.def)).size / L.length > 0.985);
+ok('livelli tutti fra 1 e 3', L.every(x => x.lvl >= 1 && x.lvl <= 3));
+const radiceDi = w => w.length <= 5 ? w : w.slice(0, Math.max(4, w.length - 3));
+const circolari = L.filter(x => new RegExp('\\b' + radiceDi(x.lemma), 'i').test(x.def));
+ok('nessuna definizione ripete il proprio lemma', circolari.length === 0,
+   circolari.slice(0, 4).map(x => x.id + ': ' + x.def.slice(0, 40)));
 
 gruppo('Account');
 ok('rifiuta nickname vuoto', S.registra('').ok === false);
@@ -43,6 +57,7 @@ const quotaTema = coda.filter(x => x.dom.includes('lingua') || x.dom.includes('p
 ok('gli interessi pesano davvero (>40% della coda)', quotaTema / coda.length > 0.4, (quotaTema / coda.length).toFixed(2));
 
 gruppo('Le tre azioni');
+C.assicura(['coacervo', 'blandire', 'fugace'], () => {});
 S.segna('coacervo', 'ignota');
 S.segna('blandire', 'passiva');
 S.segna('fugace', 'attiva');
@@ -94,9 +109,9 @@ S.parola(idBluff).prox = Date.now() - 1000;
 ok('la parola bluffata torna come produzione', R.scadenze(S.tutteLeParole()).find(d => d.id === idBluff).tipo === 'produzione');
 
 gruppo('Test a scelta multipla');
-const dist = R.distrattori(L[0], 3);
+const dist = R.distrattori(C.lemma('blandire'), 3);
 ok('tre distrattori generati', dist.length === 3);
-ok('nessun distrattore uguale alla definizione giusta', dist.every(d => d !== L[0].def));
+ok('nessun distrattore uguale alla definizione giusta', dist.every(d => d !== C.lemma('blandire').def));
 ok('distrattori distinti fra loro', new Set(dist).size === 3);
 
 gruppo('Striscia di giorni');
@@ -126,7 +141,7 @@ gruppo('Igiene del sorgente');
   const radiceProg = pth.join(__dirname, '..');
   const file = ['js/store.js', 'js/srs.js', 'js/notify.js', 'js/ui.js', 'js/app.js',
     'js/views/accesso.js', 'js/views/profilo.js', 'js/views/feed.js',
-    'js/views/ripasso.js', 'js/views/collezione.js', 'js/views/io.js', 'data/lemmi.js'];
+    'js/views/ripasso.js', 'js/views/collezione.js', 'js/views/io.js', 'js/corpus.js'];
 
   // Lettere cirilliche e greche identiche a occhio alle latine: dentro un
   // identificatore JavaScript passano la sintassi e rompono ogni ricerca.

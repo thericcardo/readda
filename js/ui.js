@@ -75,17 +75,13 @@ Readda.Ui = (function () {
     return '<svg viewBox="0 0 24 24" aria-hidden="true" class="' + (classe || '') + '">' + ICONE[nome] + '</svg>';
   }
 
-  function lemmaPerId(id) {
-    var t = window.READDA_LEMMI;
-    for (var i = 0; i < t.length; i++) if (t[i].id === id) return t[i];
-    return null;
-  }
+  function lemmaPerId(id) { return Readda.Corpus.lemma(id); }
 
   var NOMI_DOMINIO = {
     lavoro: 'Lavoro', diritto: 'Diritto', politica: 'Società', pensiero: 'Ragionamento',
     scuola: 'Scuola', scienza: 'Scienza', lingua: 'Lingua', tecnologia: 'Tecnologia',
     emozioni: 'Emozioni', tempo: 'Tempo', storia: 'Storia', natura: 'Natura',
-    medicina: 'Salute', cucina: 'Cucina', arte: 'Arte'
+    medicina: 'Salute', cucina: 'Cucina', arte: 'Arte', generale: 'Generale'
   };
   function nomeDominio(d) { return NOMI_DOMINIO[d] || d; }
 

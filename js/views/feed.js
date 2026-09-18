@@ -7,15 +7,14 @@
 window.Readda = window.Readda || {};
 
 Readda.Feed = (function () {
-  var U, S, coda = [], indice = 0, animando = false, scollegaTasti = null;
+  var U, S, coda = [], indice = 0, animando = false, scollegaTasti = null, rifornendo = false;
 
   var SOGLIA = 96;          // px oltre i quali il trascinamento vale come scelta
   var SOGLIA_SU = 110;
 
   function disegna() {
     U = Readda.Ui; S = Readda.Store;
-    coda = Readda.Srs.coda(S.profilo(), S.tutteLeParole(), 60);
-    indice = 0;
+    coda = []; indice = 0;
 
     U.rendi(
       '<div class="feed">' +
@@ -42,7 +41,36 @@ Readda.Feed = (function () {
     });
     collegaTasti();
     aggiornaDose();
-    mostra();
+    attendi();
+
+    // il corpus vive in blocchi: se ne carica una manciata, non tutto
+    Readda.Corpus.allarga(4, function () {
+      coda = Readda.Srs.coda(S.profilo(), S.tutteLeParole(), 120);
+      mostra();
+    });
+  }
+
+  function attendi() {
+    var pila = U.uno('#pila');
+    if (pila) pila.innerHTML = '<div class="attesa"><span></span><span></span><span></span></div>';
+  }
+
+  /* Quando la coda si assottiglia si aggiungono altri blocchi, senza
+   * interrompere chi sta scorrendo. */
+  function rifornisci() {
+    if (rifornendo || coda.length - indice > 10) return;
+    rifornendo = true;
+    Readda.Corpus.allarga(3, function (ancora) {
+      rifornendo = false;
+      if (!ancora) return;
+      var nuova = Readda.Srs.coda(S.profilo(), S.tutteLeParole(), 120);
+      var visti = {};
+      for (var i = 0; i <= indice && i < coda.length; i++) visti[coda[i].id] = true;
+      for (var j = 0; j < nuova.length; j++) {
+        if (!visti[nuova[j].id] && coda.indexOf(nuova[j]) < 0) coda.push(nuova[j]);
+      }
+      if (indice >= coda.length - 1) mostra();
+    });
   }
 
   function smonta() { if (scollegaTasti) { scollegaTasti(); scollegaTasti = null; } }
@@ -86,6 +114,8 @@ Readda.Feed = (function () {
 
   function mostra() {
     var pila = U.uno('#pila');
+    if (!pila) return;
+    rifornisci();
     if (indice >= coda.length) { finito(); return; }
     var prossima = coda[indice + 1];
     pila.innerHTML = (prossima ? cartaHtml(prossima, true) : '') + cartaHtml(coda[indice], false);
@@ -190,6 +220,7 @@ Readda.Feed = (function () {
       indice++;
       animando = false;
       aggiornaDose();
+      rifornisci();
       Readda.Notifiche.aggiornaPallino();
       mostra();
     }, 300);

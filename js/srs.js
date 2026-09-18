@@ -30,7 +30,7 @@ Readda.Srs = (function () {
   /* Distrattori per il test a scelta multipla: definizioni di altri lemmi,
    * preferendo quelli dello stesso dominio perché la scelta sia difficile. */
   function distrattori(lemma, quanti) {
-    var tutti = window.READDA_LEMMI;
+    var tutti = Readda.Corpus.disponibili();
     var stessoDominio = tutti.filter(function (l) {
       return l.id !== lemma.id && l.dom.some(function (d) { return lemma.dom.indexOf(d) >= 0; });
     });
@@ -55,7 +55,7 @@ Readda.Srs = (function () {
     var lavoro = profilo.lavoro;
     var tetto = ({ base: 1, medio: 2, alto: 3 })[profilo.obiettivo] || 3;
 
-    var candidati = window.READDA_LEMMI.filter(function (l) {
+    var candidati = Readda.Corpus.disponibili().filter(function (l) {
       var p = parole[l.id];
       if (p && p.stato === 'attiva') return false;
       if (p && p.stato) return false;          // già giudicato: vive nel ripasso
@@ -95,10 +95,7 @@ Readda.Srs = (function () {
   }
 
   function radici(lemma) {
-    var voce = null, tutti = window.READDA_LEMMI || [];
-    for (var i = 0; i < tutti.length; i++) {
-      if (tutti[i].lemma === lemma || tutti[i].id === lemma) { voce = tutti[i]; break; }
-    }
+    var voce = Readda.Corpus.lemma(lemma);
     var out = [radice(lemma)];
     if (voce && voce.forme) {
       voce.forme.forEach(function (f) { out.push(normalizza(f)); });

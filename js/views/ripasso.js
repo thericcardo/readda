@@ -18,7 +18,9 @@ Readda.Ripasso = (function () {
     });
     i = 0; fatte = 0;
     if (!sessione.length) { nulla(); return; }
-    render();
+    // le voci in scadenza possono stare in blocchi non ancora caricati
+    U.rendi('<div class="attesa"><span></span><span></span><span></span></div>');
+    Readda.Corpus.assicura(sessione.map(function (x) { return x.id; }), render);
   }
 
   function nulla() {

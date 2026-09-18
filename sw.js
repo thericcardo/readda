@@ -4,12 +4,15 @@
 var CACHE = 'readda-v1';
 var GUSCIO = [
   './', './index.html', './assets/styles.css',
-  './data/lemmi.js', './js/store.js', './js/srs.js', './js/notify.js', './js/ui.js',
+  './data/manifesto.js', './js/corpus.js',
+  './js/store.js', './js/srs.js', './js/notify.js', './js/ui.js',
   './js/views/accesso.js', './js/views/profilo.js', './js/views/feed.js',
   './js/views/ripasso.js', './js/views/collezione.js', './js/views/io.js',
   './js/app.js', './manifest.webmanifest'
 ];
 
+/* I blocchi del corpus non stanno nel guscio: si mettono in cache quando
+   vengono chiesti, cosi' la prima apertura resta leggera. */
 self.addEventListener('install', function (e) {
   e.waitUntil(caches.open(CACHE).then(function (c) { return c.addAll(GUSCIO); }).then(function () {
     return self.skipWaiting();

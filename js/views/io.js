@@ -66,6 +66,19 @@ Readda.Io = (function () {
         '</div>' +
 
         '<div class="riquadro">' +
+          '<h3>Da dove vengono le parole</h3>' +
+          '<p>' + U.esc(Readda.Corpus.totale().toLocaleString('it-IT')) + ' voci, di cui ' +
+            U.esc(Readda.Corpus.manifesto().curati || 0) + ' scritte a mano. ' +
+            'Le altre vengono dal <b>Wikizionario italiano</b>, ripulite e filtrate: ' +
+            'restano solo le parole che si riconoscono ma non si usano.</p>' +
+          '<p style="margin-top:10px;font-size:11.5px;color:var(--inchiostro-4);line-height:1.5">' +
+            'Testi delle definizioni: Wikizionario, licenza ' +
+            '<a href="https://creativecommons.org/licenses/by-sa/3.0/deed.it" target="_blank" ' +
+            'rel="noopener" style="color:var(--oro-tenue)">CC BY-SA 3.0</a>, con modifiche. ' +
+            'Chi ridistribuisce questo corpus deve mantenere la stessa licenza.</p>' +
+        '</div>' +
+
+        '<div class="riquadro">' +
           '<h3>Backup</h3>' +
           '<p>I dati stanno solo in questo browser. Esporta una stringa e conservala: ' +
              'è l’unico modo per ritrovarli altrove.</p>' +

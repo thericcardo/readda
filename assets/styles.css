@@ -475,6 +475,18 @@ textarea.campo{resize:none;line-height:1.6;min-height:104px}
 @keyframes salifoglio{from{transform:translateY(100%)}to{transform:none}}
 .maniglia{width:38px;height:4px;border-radius:99px;background:var(--inchiostro-4);margin:0 auto 22px}
 
+.attesa{
+  display:flex;gap:7px;align-items:center;justify-content:center;
+  min-height:220px;padding:70px 0;
+}
+.attesa span{
+  width:7px;height:7px;border-radius:50%;background:var(--oro);opacity:.3;
+  animation:respiro 1.25s var(--calmo) infinite;
+}
+.attesa span:nth-child(2){animation-delay:.16s}
+.attesa span:nth-child(3){animation-delay:.32s}
+@keyframes respiro{0%,100%{opacity:.22;transform:scale(.82)}45%{opacity:1;transform:scale(1)}}
+
 /* ============ brindisi (toast) ============ */
 .brindisi{
   position:fixed;z-index:80;left:50%;

@@ -19,6 +19,19 @@ function gruppo(n) { console.log('\n' + n); }
   const ctx = await browser.newContext({ viewport: { width: 390, height: 844 }, deviceScaleFactor: 2, locale: 'it-IT' });
   const page = await ctx.newPage();
 
+  // quanto pesa davvero la prima apertura: il corpus e' 3,6 MB in 64 blocchi,
+  // e all'avvio non deve scaricarsene piu' di una manciata
+  const scaricato = { avvio: 0, blocchi: 0, nBlocchi: 0 };
+  let avvioFinito = false;
+  page.on('response', async r => {
+    const u = r.url();
+    if (!u.includes('127.0.0.1:8777')) return;
+    let n = 0;
+    try { n = (await r.body()).length; } catch (e) { return; }
+    if (/blocco-\d+\.js/.test(u)) { scaricato.blocchi += n; scaricato.nBlocchi++; }
+    else if (!avvioFinito) scaricato.avvio += n;
+  });
+
   const errori = [];
   // le risorse esterne (Google Fonts) possono fallire dietro un proxy:
   // non e' un difetto dell'app, che ha i suoi fallback di sistema
@@ -60,6 +73,15 @@ function gruppo(n) { console.log('\n' + n); }
   await page.click('.scelta[data-v="alto"]');
   await page.click('#avanti');
 
+  gruppo('Peso del corpus');
+  ok('l\'avvio scarica meno di 300 KB', scaricato.avvio < 300 * 1024,
+     Math.round(scaricato.avvio / 1024) + ' KB');
+  const corpus = await page.evaluate(() => ({
+    totale: Readda.Corpus.totale(), blocchi: Readda.Corpus.nBlocchi(),
+    caricati: Readda.Corpus.quantiCaricati()
+  }));
+  ok('il corpus dichiara almeno 10.000 voci', corpus.totale >= 10000, corpus);
+
   gruppo('Flusso');
   await page.waitForSelector('#carta-viva');
   ok('la barra di navigazione compare', await page.locator('#barra').isVisible());
@@ -96,6 +118,11 @@ function gruppo(n) { console.log('\n' + n); }
   await page.waitForTimeout(480);
   await page.click('[data-giudizio="attiva"]');
   await page.waitForTimeout(480);
+
+  const dopoFlusso = await page.evaluate(() => Readda.Corpus.quantiCaricati());
+  ok('il flusso carica solo pochi blocchi, non tutti', dopoFlusso > 0 && dopoFlusso <= 12, dopoFlusso);
+  ok('i blocchi scaricati pesano meno di 1 MB', scaricato.blocchi < 1024 * 1024,
+     Math.round(scaricato.blocchi / 1024) + ' KB in ' + scaricato.nBlocchi + ' blocchi');
 
   gruppo('Scorciatoie da tastiera');
   const primaTasto = (await page.textContent('#carta-viva .lemma')).trim();

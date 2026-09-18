@@ -51,6 +51,31 @@ Non c'è niente da compilare e non ci sono dipendenze a runtime: HTML, CSS e Jav
 semplice (script classici, nessun modulo), così l'app si può anche solo copiare su
 GitHub Pages o su qualunque cartella servita via HTTP.
 
+## Il ciclo: aggiungere parole nel tempo
+
+```bash
+python3 strumenti/aggiorna.py                  # ciclo completo
+python3 strumenti/aggiorna.py --salta-scarico  # riusa le fonti gia' prese
+python3 strumenti/aggiorna.py --solo-report    # confronta senza toccare niente
+```
+
+Scarica il dump piu' recente del Wikizionario e la lista di frequenza, riestrae,
+ricostruisce i blocchi e stampa cosa e' cambiato: quante voci nuove, quante
+tolte, quante definizioni aggiornate. Lo storico delle esecuzioni finisce in
+`data/storico.json`.
+
+La pipeline sta tutta in `strumenti/`:
+
+| File | Cosa fa |
+|---|---|
+| `aggiorna.py` | Orchestra il ciclo e riporta le differenze |
+| `estrai.py` | Dal dump alle voci grezze: markup via, campi fuori |
+| `costruisci.py` | Filtri, livelli, domini, tipografia, scrittura dei blocchi |
+| `curati.js` | Le 134 voci scritte a mano, che vincono sugli omonimi automatici |
+
+Per aggiungere lemmi propri basta scriverli in `curati.js` e rieseguire: hanno
+sempre la precedenza sulla versione automatica.
+
 ## Le prove
 
 ```bash
@@ -60,8 +85,8 @@ node test/icone.js                                  # rigenera le icone PWA
 ```
 
 `test/e2e.js` vuole un server attivo sulla porta 8777 e Chromium; scrive le schermate
-in `scatti/`. Le due suite insieme fanno **116 asserzioni** e hanno trovato sette
-difetti veri, tutti corretti:
+in `scatti/`. Le due suite insieme fanno **124 asserzioni** e hanno trovato nove difetti veri,
+tutti corretti:
 
 | Difetto | Perché contava |
 |---|---|
@@ -72,6 +97,8 @@ difetti veri, tutti corretti:
 | Identificatori con una **а cirillica** al posto della `a` | Coerenti, quindi funzionanti — ma la prima modifica che avesse scritto `ferma` in latino sarebbe stata un `ReferenceError` silenzioso |
 | Una classe di caratteri regex scritta con **diacritici combinanti letterali** | Caratteri invisibili attaccati alla parentesi quadra, illeggibili e fragili alla ri-codifica |
 | Stringhe in forma **decomposta** (`Gia` + accento combinante) | Si vedono uguali, ma una ricerca per «Già» non le trova |
+| Il campo `forme` non veniva esportato nei blocchi | I participi irregolari tornavano a essere rifiutati, in silenzio |
+| `radice_lemma` tagliava i suffissi da una lista, e la lista aveva un buco | Mancava `-ico`, quindi «ironico: incline all'ironia» passava il filtro anticircolare |
 
 Gli ultimi tre erano latenti: nessuno rompeva l'app quel giorno, tutti l'avrebbero rotta
 alla prima modifica. `test/prova.js` ora contiene le guardie che li impediscono di
@@ -84,7 +111,10 @@ tornare.
 ```
 index.html               guscio e ordine di caricamento
 assets/styles.css        sistema visivo (variabili, componenti)
-data/lemmi.js            134 lemmi italiani con definizione, esempio, sillabazione
+data/manifesto.js        conteggi del corpus: 731 byte, l'unico dato caricato all'avvio
+data/blocco-NN.js        64 blocchi da ~52 KB, assegnati per hash del lemma
+strumenti/               la pipeline che genera il corpus
+js/corpus.js             caricamento dei blocchi su richiesta
 js/store.js              stato e persistenza su localStorage, per nickname
 js/srs.js                Leitner a 6 caselle, coda del flusso, confronto per radice
 js/notify.js             promemoria lato client
@@ -94,12 +124,52 @@ js/app.js                instradamento via hash
 sw.js                    guscio offline
 ```
 
-**Il corpus.** 134 lemmi scelti nella fascia che interessa il prodotto: parole che un
-italofono adulto riconosce ma raramente produce (`blandire`, `coacervo`, `surrettizio`,
-`accidia`, `dirimente`). Ogni voce porta categoria grammaticale, sillabazione con accento
-tonico, definizione, esempio d'uso, sinonimi, dominio e livello di rarità. I distrattori
-del test a scelta multipla si generano a runtime pescando definizioni di lemmi dello
-stesso dominio, così la scelta è difficile e non c'è da scriverli a mano.
+**Il corpus. 11.326 voci**, di cui 134 scritte a mano e 11.192 ricavate dal
+Wikizionario italiano. Non e' il Wikizionario travasato: di 782.769 pagine lette
+ne sopravvive l'1,4%, perche' la pipeline tiene solo cio' che serve a questo
+prodotto. Ogni voce porta categoria grammaticale, sillabazione con accento
+tonico (`de·no·ta·zió·ne`), definizione, sinonimi, dominio, registro, livello di
+rarita' e, dove c'e', un esempio d'uso.
+
+Il criterio di selezione e' quello che decide se l'app funziona, e distingue due
+cose che all'inizio avevo confuso in una sola:
+
+| | |
+|---|---|
+| **Aderenza** | Quanto la parola serve a chi vuole parlare meglio. Decide se entra. |
+| **Completezza** | Quanto la scheda e' ricca. Ordina, non esclude. |
+
+Senza questa separazione in cima finiscono `sabotare` e `contagiare`, che tutti
+usano gia', e in fondo `zappa` e `siringa`, che nessuno deve imparare.
+
+Cosa viene scartato, e perche':
+
+| Scarto | Voci | Motivo |
+|---|---:|---|
+| Non e' lessico da prodotto | 11.147 | Oggetti concreti, parole quotidiane, aggettivi di provenienza |
+| Definizione circolare | 3.749 | «ironico: che si esprime con ironia» non insegna niente |
+| Coda troppo rara | 3.402 | `antibechico`, `opsonizzante`: nessuno le riconosce |
+| Rimanda a un'altra voce | 2.230 | «diminutivo di...», «variante di...» |
+| Troppo comune | 631 | Sotto il rango 1.500 nella lista di frequenza |
+| Forma flessa | 450 | «terza persona singolare di...» |
+| Citazione al posto della glossa | 77 | Un verso di Foscolo non e' una definizione |
+
+Il filtro piu' importante e' la **trasparenza morfologica**: `distinguibile` e
+`controproducente` si ricavano da parole che gia' si conoscono, quindi impararle
+non cambia come si parla. `blandire` e `accidia` no: quelle sono il prodotto.
+
+**Il livello** viene dal rango di frequenza su OpenSubtitles: 1.500-20.000 e'
+livello 1, fino a 80.000 livello 2, oltre (o assente) livello 3. La fascia
+15.000-200.000 e' il centro di gravita' del prodotto, dove stanno le parole che
+si riconoscono leggendo e non si dicono mai.
+
+**Come sta in memoria.** 3,4 MB di corpus non si caricano all'avvio. Le voci
+sono divise in 64 blocchi da circa 52 KB, e il blocco di un lemma si **calcola**
+dal lemma stesso con un FNV-1a a 32 bit, identico in `strumenti/costruisci.py` e
+in `js/corpus.js`. Quindi non c'e' nessun indice da scaricare, l'avvio pesa meno
+di 300 KB, i blocchi arrivano mentre si scorre, e - siccome il numero di blocchi
+e' fisso - **aggiungere voci non sposta mai quelle gia' pubblicate**: un
+aggiornamento fa riscaricare solo i blocchi cambiati.
 
 **La selezione del flusso** pesa ogni lemma su mestiere e interessi dichiarati e sul
 livello scelto, con un po' di rumore per non rendere l'ordine prevedibile.
@@ -117,14 +187,17 @@ e stanno dichiarati nel corpus come radici alternative.
    gestore `push` pronto: manca solo il pezzo server.
 2. **Non c'è sincronizzazione fra dispositivi.** Il backup si esporta e si importa a mano.
    È una conseguenza diretta del «niente email»: è un compromesso, non una svista.
-3. **Il corpus è un seme, non un dizionario.** 134 lemmi bastano per qualche settimana
-   d'uso, non per un anno.
+3. **Le definizioni sono quelle del Wikizionario**, non di un dizionario
+   professionale: la qualità varia, e qualche glossa resta goffa. Il filtro
+   toglie le peggiori, non le rende buone. Vedi [FONTI.md](FONTI.md) per la
+   licenza CC BY-SA, che è virale: chi ridistribuisce il corpus deve mantenerla.
 4. **Il controllo delle frasi verifica che la parola ci sia, non che sia usata bene.**
    Distinguere l'uso corretto dal calco goffo richiede un modello linguistico.
 
 ## Passi successivi, in ordine di resa
 
 1. Server minimo per Web Push: è ciò che trasforma i promemoria da promessa a funzione.
-2. Ampliare il corpus a qualche migliaio di lemmi, con provenienza dichiarata.
+2. Riscrivere a mano le definizioni più goffe, partendo da quelle che compaiono
+   di più: ogni voce riscritta esce dal vincolo CC BY-SA.
 3. Valutazione automatica delle frasi scritte: da «contiene la parola» a «la usa bene».
 4. Sincronizzazione legata al codice di ripristino, se si accetta un server.

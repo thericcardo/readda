@@ -23,4 +23,27 @@ function carica(rel) {
   vm.runInContext(fs.readFileSync(path.join(radice, rel), 'utf8'), ctx, { filename: rel });
 }
 
-module.exports = { ctx, carica };
+/* Finto DOM quanto basta al caricatore dei blocchi: appendChild di uno script
+ * esegue davvero il file, che a sua volta chiama window.READDA_BLOCCO. */
+ctx.document = {
+  head: {
+    appendChild(s) {
+      const f = path.join(radice, s.src);
+      if (fs.existsSync(f)) vm.runInContext(fs.readFileSync(f, 'utf8'), ctx, { filename: s.src });
+      else if (s.onerror) s.onerror();
+    }
+  },
+  createElement: () => ({ src: '', async: false, onerror: null })
+};
+
+/* Carica manifesto, caricatore e i primi n blocchi del corpus. */
+function caricaCorpus(nBlocchi) {
+  carica('data/manifesto.js');
+  carica('js/corpus.js');
+  for (let n = 0; n < (nBlocchi === undefined ? 6 : nBlocchi); n++) {
+    carica('data/blocco-' + String(n).padStart(2, '0') + '.js');
+  }
+  return ctx.Readda.Corpus;
+}
+
+module.exports = { ctx, carica, caricaCorpus };
