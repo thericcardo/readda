@@ -70,10 +70,10 @@ Readda.Notifiche = (function () {
   }
 
   function avvia() {
-    fermа();
+    ferma();
     timer = setInterval(controlla, INTERVALLO);
   }
-  function fermа() { if (timer) { clearInterval(timer); timer = null; } }
+  function ferma() { if (timer) { clearInterval(timer); timer = null; } }
 
   function aggiornaPallino() {
     var el = document.querySelector('.pallino');
@@ -83,7 +83,7 @@ Readda.Notifiche = (function () {
 
   return {
     supportate: supportate, permesso: permesso, chiedi: chiedi,
-    dovute: dovute, avvia: avvia, ferma: fermа,
+    dovute: dovute, avvia: avvia, ferma: ferma,
     aggiornaPallino: aggiornaPallino, invia: invia
   };
 })();

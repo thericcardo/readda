@@ -189,6 +189,32 @@ function gruppo(n) { console.log('\n' + n); }
   ok('il codice di ripristino è ancora lì', (await page.textContent('.io')).includes(codice));
   await page.screenshot({ path: path.join(SCATTI, '10-io.png'), fullPage: true });
 
+  gruppo('Impostazioni dal vivo');
+  await page.click('[data-dose="25"]');
+  await page.waitForTimeout(350);
+  ok('la dose cambia e resta selezionata',
+     await page.getAttribute('.filtro[data-dose="25"]', 'aria-pressed') === 'true');
+  const dosePersistita = await page.evaluate(() => Readda.Store.impostazioni().dose);
+  ok('la dose e\' salvata nello stato', dosePersistita === 25, dosePersistita);
+  await page.click('.tab[data-rotta="#/feed"]');
+  await page.waitForSelector('#dose-txt');
+  ok('il flusso usa la nuova dose', (await page.textContent('#dose-txt')).endsWith('/ 25'),
+     await page.textContent('#dose-txt'));
+  await page.click('.tab[data-rotta="#/io"]');
+  await page.waitForSelector('.numeri');
+
+  // percorso mai esercitato prima: accensione e spegnimento dei promemoria
+  const spegnimento = await page.evaluate(() => {
+    try {
+      Readda.Store.imposta('notifiche', true);
+      Readda.Notifiche.avvia();
+      Readda.Notifiche.ferma();
+      Readda.Store.imposta('notifiche', false);
+      return 'ok';
+    } catch (e) { return e.message; }
+  });
+  ok('avvia e ferma i promemoria senza errori', spegnimento === 'ok', spegnimento);
+
   await page.click('#esporta');
   await page.waitForSelector('#pacco');
   const backup = await page.inputValue('#pacco');

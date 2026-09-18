@@ -120,5 +120,50 @@ S.entra('Riccardo');
 ok('i dati del primo utente sono intatti', Object.keys(S.tutteLeParole()).length === quante);
 ok('entrambi i nickname sono elencati', S.elencoNick().length === 2, S.elencoNick());
 
+gruppo('Igiene del sorgente');
+{
+  const fsm = require('fs'), pth = require('path');
+  const radiceProg = pth.join(__dirname, '..');
+  const file = ['js/store.js', 'js/srs.js', 'js/notify.js', 'js/ui.js', 'js/app.js',
+    'js/views/accesso.js', 'js/views/profilo.js', 'js/views/feed.js',
+    'js/views/ripasso.js', 'js/views/collezione.js', 'js/views/io.js', 'data/lemmi.js'];
+
+  // Lettere cirilliche e greche identiche a occhio alle latine: dentro un
+  // identificatore JavaScript passano la sintassi e rompono ogni ricerca.
+  const INGANNEVOLI = /[\u0400-\u04FF\u0370-\u03FF]/;
+  const sporchi = [];
+  for (const f of file) {
+    const t = fsm.readFileSync(pth.join(radiceProg, f), 'utf8');
+    // via stringhe e commenti: negli identificatori non ci devono essere
+    const codice = t.replace(/'(?:\\.|[^'\\])*'|"(?:\\.|[^"\\])*"|\/\*[\s\S]*?\*\/|\/\/[^\n]*/g, ' ');
+    if (INGANNEVOLI.test(codice)) sporchi.push(f);
+  }
+  ok('nessuna lettera cirillica o greca negli identificatori', sporchi.length === 0, sporchi);
+
+  // I diacritici combinanti letterali sono invisibili nell'editor: solo escape.
+  const combinantiNudi = [];
+  for (const f of file) {
+    const t = fsm.readFileSync(pth.join(radiceProg, f), 'utf8');
+    if (/[\u0300-\u036f]/.test(t.replace(/[\u00C0-\u017F]/g, ''))) combinantiNudi.push(f);
+  }
+  ok('nessun diacritico combinante nudo nel sorgente', combinantiNudi.length === 0, combinantiNudi);
+}
+
+gruppo('Accenti e maiuscole nel riconoscimento');
+ok('ignora le maiuscole', R.contiene('BLANDIRE la folla', 'blandire'));
+ok('ignora gli accenti nel testo', R.contiene('La perifrasi \u00e8 gi\u00e0 una perifrasi', 'perifrasi'));
+ok('trova un lemma accentato scritto senza accento', R.contiene('una societa perduta', 'societ\u00e0'));
+ok('la punteggiatura attaccata non disturba', R.contiene('Che coacervo!', 'coacervo'));
+ok('non confonde una parola che la contiene a meta\u0027', !R.contiene('il tedesco parla', 'tedio'));
+
+gruppo('Impostazioni');
+S.entra('Riccardo');
+S.imposta('dose', 25);
+ok('la dose si salva', S.impostazioni().dose === 25);
+S.imposta('notifiche', true);
+ok('le notifiche si salvano', S.impostazioni().notifiche === true);
+S.entra('Ospite'); S.entra('Riccardo');
+ok('le impostazioni sopravvivono al cambio account', S.impostazioni().dose === 25);
+
 console.log('\n' + (fallite === 0 ? 'TUTTO VERDE' : 'CI SONO ERRORI') + ' — ' + passate + ' passate, ' + fallite + ' fallite\n');
 process.exit(fallite ? 1 : 0);

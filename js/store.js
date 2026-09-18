@@ -218,7 +218,7 @@ Readda.Store = (function () {
 
   /* ---------- impostazioni ---------- */
   function impostazioni() { return stato.impostazioni; }
-  function impostа(k, v) { stato.impostazioni[k] = v; salva(); }
+  function imposta(k, v) { stato.impostazioni[k] = v; salva(); }
 
   /* ---------- esportazione / importazione ---------- */
   function esporta() {
@@ -255,7 +255,7 @@ Readda.Store = (function () {
     dimentica: dimentica, perStato: perStato, contaVisti: contaVisti,
     tutteLeParole: function () { return stato.parole; },
     strisciaViva: strisciaViva, fatteOggi: fatteOggi,
-    impostazioni: impostazioni, imposta: impostа,
+    impostazioni: impostazioni, imposta: imposta,
     esporta: esporta, importa: importa, cancellaAccount: cancellaAccount,
     salva: salva,
     caricato: function () { return !!stato; }

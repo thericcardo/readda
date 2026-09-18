@@ -9,7 +9,7 @@ Readda.Accesso = (function () {
     U = Readda.Ui; S = Readda.Store;
     var esistenti = S.elencoNick();
     var scorciatoie = esistenti.length
-      ? '<div class="switcher">Già su questo dispositivo: ' +
+      ? '<div class="switcher">Già su questo dispositivo: ' +
         esistenti.map(function (n) {
           return '<button data-rapido="' + U.esc(n) + '">' + U.esc(n) + '</button>';
         }).join(' · ') + '</div>'
@@ -26,7 +26,7 @@ Readda.Accesso = (function () {
                  'autocomplete="off" autocapitalize="none" spellcheck="false" maxlength="24">' +
           '<button class="btn btn-oro btn-pieno" type="submit">Comincia</button>' +
           '<p class="nota" id="nota">Niente email, niente password.<br>' +
-            'Ti diamo un <b>codice di ripristino</b>: è l’unico modo per riprenderti i tuoi dati.</p>' +
+            'Ti diamo un <b>codice di ripristino</b>: è l’unico modo per riprenderti i tuoi dati.</p>' +
         '</form>' +
         scorciatoie +
         '<div class="switcher"><button id="ripristina">Ho già un codice di ripristino</button></div>' +

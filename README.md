@@ -60,11 +60,22 @@ node test/icone.js                                  # rigenera le icone PWA
 ```
 
 `test/e2e.js` vuole un server attivo sulla porta 8777 e Chromium; scrive le schermate
-in `scatti/`. Le due suite insieme fanno 52 asserzioni e hanno già trovato quattro
-difetti veri: la barra di navigazione che intercettava i tocchi da nascosta, la carta
-del flusso che finiva sotto i pulsanti, le liste che sforavano lo schermo per via di un
-track di griglia `auto`, e i participi irregolari (`eludere` → `eluso`) che il
-riconoscimento per radice non copriva.
+in `scatti/`. Le due suite insieme fanno **116 asserzioni** e hanno trovato sette
+difetti veri, tutti corretti:
+
+| Difetto | Perché contava |
+|---|---|
+| La barra di navigazione intercettava i tocchi mentre era nascosta | `[hidden]` perde contro `display:grid`: bloccava l'onboarding, nessuno arrivava al flusso |
+| La carta del flusso finiva sotto i pulsanti azione | Il centraggio era calcolato su un'area che li includeva |
+| Le liste sforavano lo schermo di 250px | Il track di griglia `auto` cresce fino al contenuto: serve `minmax(0,1fr)` |
+| I participi irregolari non erano riconosciuti | `eludere` → `eluso`: una frase corretta veniva rifiutata |
+| Identificatori con una **а cirillica** al posto della `a` | Coerenti, quindi funzionanti — ma la prima modifica che avesse scritto `ferma` in latino sarebbe stata un `ReferenceError` silenzioso |
+| Una classe di caratteri regex scritta con **diacritici combinanti letterali** | Caratteri invisibili attaccati alla parentesi quadra, illeggibili e fragili alla ri-codifica |
+| Stringhe in forma **decomposta** (`Gia` + accento combinante) | Si vedono uguali, ma una ricerca per «Già» non le trova |
+
+Gli ultimi tre erano latenti: nessuno rompeva l'app quel giorno, tutti l'avrebbero rotta
+alla prima modifica. `test/prova.js` ora contiene le guardie che li impediscono di
+tornare.
 
 ---
 
