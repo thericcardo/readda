@@ -102,7 +102,7 @@ Readda.Collezione = (function () {
         (p.prox ? 'Prossimo ripasso ' + U.esc(U.quando(p.prox)) : 'Fuori dal ripasso') +
         ' · ' + p.ok + ' giuste, ' + p.ko + ' sbagliate</p>' +
       (p.curato ? '' :
-        '<p style="margin-top:20px;font-size:11px;color:var(--inchiostro-4);line-height:1.5">' +
+        '<p style="margin-top:20px;font-size:11.5px;color:var(--inchiostro-3);line-height:1.5">' +
         'Definizione dal Wikizionario italiano, CC BY-SA 3.0, con modifiche.</p>') +
       '<button class="btn btn-muto btn-pieno" id="togli" style="margin-top:18px">Toglila dalla raccolta</button>',
       function (foglioEl, chiudi) {

@@ -43,7 +43,7 @@ Readda.Io = (function () {
           '</div>' +
           '<button class="interruttore" id="sw-notifiche" role="switch" ' +
             'aria-checked="' + attive_notifiche + '" aria-label="Promemoria"></button></div>' +
-          '<p style="margin-top:14px;font-size:11.5px;color:var(--inchiostro-4);line-height:1.5">' +
+          '<p style="margin-top:14px;font-size:12px;color:var(--inchiostro-3);line-height:1.5">' +
             'Senza un server, il browser può avvisarti solo mentre Readda è aperta o da poco chiusa. ' +
             'Vedi il README per il passo successivo.</p>' +
         '</div>' +
@@ -71,7 +71,7 @@ Readda.Io = (function () {
             U.esc(Readda.Corpus.manifesto().curati || 0) + ' scritte a mano. ' +
             'Le altre vengono dal <b>Wikizionario italiano</b>, ripulite e filtrate: ' +
             'restano solo le parole che si riconoscono ma non si usano.</p>' +
-          '<p style="margin-top:10px;font-size:11.5px;color:var(--inchiostro-4);line-height:1.5">' +
+          '<p style="margin-top:10px;font-size:12px;color:var(--inchiostro-3);line-height:1.5">' +
             'Testi delle definizioni: Wikizionario, licenza ' +
             '<a href="https://creativecommons.org/licenses/by-sa/3.0/deed.it" target="_blank" ' +
             'rel="noopener" style="color:var(--oro-tenue)">CC BY-SA 3.0</a>, con modifiche. ' +
@@ -83,7 +83,7 @@ Readda.Io = (function () {
           '<p>I dati stanno solo in questo browser. Esporta una stringa e conservala: ' +
              'è l’unico modo per ritrovarli altrove.</p>' +
           '<button class="btn btn-filo btn-pieno" id="esporta">Esporta i miei dati</button>' +
-          '<p style="margin-top:12px;font-size:11.5px;color:var(--inchiostro-4)">Codice di ripristino: ' +
+          '<p style="margin-top:12px;font-size:12px;color:var(--inchiostro-3)">Codice di ripristino: ' +
             '<span style="color:var(--oro-tenue);font-family:ui-monospace,monospace">' + U.esc(p.codice) + '</span></p>' +
         '</div>' +
 

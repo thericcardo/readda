@@ -164,6 +164,18 @@ gruppo('Igiene del sorgente');
   ok('nessun diacritico combinante nudo nel sorgente', combinantiNudi.length === 0, combinantiNudi);
 }
 
+gruppo('Leggibilita\' delle note obbligatorie');
+{
+  const fsm = require('fs'), pth = require('path');
+  const io = fsm.readFileSync(pth.join(__dirname, '..', 'js/views/io.js'), 'utf8');
+  ok('l\'attribuzione della licenza e\' nel sorgente', /CC BY-SA 3\.0/.test(io));
+  ok('rimanda alla licenza con un collegamento', /creativecommons\.org\/licenses\/by-sa\/3\.0/.test(io));
+  ok('dice che la clausola e\' virale', /mantenere la stessa licenza/.test(io));
+  // --inchiostro-4 sta al 16% di opacita': invisibile, inaccettabile per una nota legale
+  ok('nessuna nota resa col grigio piu\' tenue', !/inchiostro-4/.test(io),
+     (io.match(/[^']*inchiostro-4[^']*/g) || []).slice(0, 2));
+}
+
 gruppo('Accenti e maiuscole nel riconoscimento');
 ok('ignora le maiuscole', R.contiene('BLANDIRE la folla', 'blandire'));
 ok('ignora gli accenti nel testo', R.contiene('La perifrasi \u00e8 gi\u00e0 una perifrasi', 'perifrasi'));
