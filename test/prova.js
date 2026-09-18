@@ -164,6 +164,33 @@ gruppo('Igiene del sorgente');
   ok('nessun diacritico combinante nudo nel sorgente', combinantiNudi.length === 0, combinantiNudi);
 }
 
+gruppo('Lessico esplicito');
+{
+  const tutte = C.disponibili();
+  const segnate = tutte.filter(x => x.sens);
+  ok('qualche voce e\' segnata come esplicita', segnate.length > 0, segnate.length);
+  ok('sono una frazione minima del corpus', segnate.length / tutte.length < 0.02,
+     (100 * segnate.length / tutte.length).toFixed(2) + '%');
+  // la precisione conta piu' della copertura: un falso positivo toglie una
+  // parola buona dal flusso senza che nessuno se ne accorga
+  const innocenti = ['cazzuola', 'piscina', 'inculcare', 'troiano', 'zoccolo', 'introito',
+                     'verificare', 'classificare', 'pacificare', 'marrone', 'sedurre',
+                     'omosessuale', 'minzione', 'circoncisione', 'defecazione'];
+  const sbagliate = innocenti.filter(id => { const v = C.lemma(id); return v && v.sens; });
+  ok('nessun omografo innocente viene segnato', sbagliate.length === 0, sbagliate);
+  ok('i termini clinici e neutri restano nel flusso',
+     ['minzione', 'omosessuale', 'circoncisione'].every(id => { const v = C.lemma(id); return !v || !v.sens; }));
+
+  const prof = { interessi: ['lingua'], lavoro: 'scuola', obiettivo: 'alto' };
+  const spenta = R.coda(prof, {}, 4000, false);
+  const accesa = R.coda(prof, {}, 4000, true);
+  ok('col filtro spento il flusso non pesca voci esplicite',
+     spenta.every(x => !x.sens), spenta.filter(x => x.sens).slice(0, 3).map(x => x.id));
+  ok('col filtro acceso le voci esplicite tornano disponibili',
+     accesa.length >= spenta.length);
+  ok('l\'impostazione parte spenta', S.impostazioni().esplicito === false);
+}
+
 gruppo('Leggibilita\' delle note obbligatorie');
 {
   const fsm = require('fs'), pth = require('path');

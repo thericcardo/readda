@@ -50,7 +50,7 @@ Readda.Srs = (function () {
 
   /* Coda del flusso: pesa i lemmi su interessi, lavoro e livello dichiarato,
    * escludendo quelli già giudicati. */
-  function coda(profilo, parole, quante) {
+  function coda(profilo, parole, quante, esplicito) {
     var interessi = profilo.interessi || [];
     var lavoro = profilo.lavoro;
     var tetto = ({ base: 1, medio: 2, alto: 3 })[profilo.obiettivo] || 3;
@@ -59,6 +59,9 @@ Readda.Srs = (function () {
       var p = parole[l.id];
       if (p && p.stato === 'attiva') return false;
       if (p && p.stato) return false;          // già giudicato: vive nel ripasso
+      // le voci segnate come esplicite restano nel corpus ma fuori dal flusso,
+      // finche' non si accende l'interruttore in Io
+      if (l.sens && !esplicito) return false;
       return l.lvl <= tetto + 1;
     });
 

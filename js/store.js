@@ -28,7 +28,7 @@ Readda.Store = (function () {
       profilo: { nick: n, codice: codice, lavoro: null, interessi: [], obiettivo: null, creato: Date.now(), completo: false },
       parole: {},
       stats: { striscia: 0, ultimoGiorno: null, giorni: [], scorse: 0 },
-      impostazioni: { notifiche: false, dose: 15, oraPromemoria: 20 }
+      impostazioni: { notifiche: false, dose: 15, oraPromemoria: 20, esplicito: false }
     };
   }
 
@@ -217,7 +217,11 @@ Readda.Store = (function () {
   }
 
   /* ---------- impostazioni ---------- */
-  function impostazioni() { return stato.impostazioni; }
+  function impostazioni() {
+    // gli account creati prima che l'impostazione esistesse non ce l'hanno
+    if (stato.impostazioni.esplicito === undefined) stato.impostazioni.esplicito = false;
+    return stato.impostazioni;
+  }
   function imposta(k, v) { stato.impostazioni[k] = v; salva(); }
 
   /* ---------- esportazione / importazione ---------- */

@@ -170,6 +170,68 @@ def tipografia(t):
     if t[-1] not in '.!?;:\u2026': t += '.'
     return t
 
+# ---------------------------------------------------- lessico esplicito
+# Segnare non vuol dire togliere: le voci restano nel corpus, ma non compaiono
+# nel flusso finche' non si accende l'interruttore in Io. Serve perche' un
+# flusso casuale puo' pescare "smorzacandela" davanti a chiunque, anche in aula.
+#
+# NON si segnano i termini clinici (minzione, circoncisione, defecazione) ne'
+# quelli neutri su identita' e orientamento (omosessuale, poliamoroso):
+# toglierli sarebbe un errore, non una cautela.
+
+# La volgarita' sta nella parola, non nella definizione: il Wikizionario marca
+# l'intera voce come volgare se anche una sola accezione lo e', e cosi'
+# "marrone" (la castagna) e "sedurre" finivano segnati.
+# Le radici sono ancorate all'inizio: cercarle come sottostringhe fa diventare
+# esplicite "verificare", "classificare" e "pacificare".
+RADICE_VOLGARE = re.compile(
+    r'^(?:s|ri|in|stra|scu)?(?:cazz|coglion|puttan|stronz|merd|troi|vaffa|incul|minchi'
+    r'|pirl|sborr|bocchin|cacar|cacat|pisci|scoregg|frocio|magnacc|paracul|pippa'
+    r'|fellat|sodom|necrofil|pedoporn|pornost|pornodiv|pornograf|masturb|incest'
+    r'|lenocin|lenone|guardon|smorzacandel|vaginism|zoccol|mignott)', re.I)
+
+# omografi innocenti che la radice cattura per sbaglio
+NON_VOLGARI = {
+    'cazzuola', 'cazzotto', 'scazzottata',           # utensile, pugno, rissa
+    'piscina', 'piscivoro',                          # vasca, che mangia pesci
+    'troiano',                                       # della citta' di Troia
+    'zoccolo', 'zoccolaio', 'zoccolare', 'zoccolatura',
+    'introito', 'introiti', 'introitare', 'introiezione', 'introiettare',
+    'inculcare', 'inculcato',
+}
+
+# definizioni che descrivono un atto esplicito: l'ancoraggio evita di segnare
+# ogni parola la cui glossa nomini il sesso di passaggio (per esempio "sedurre")
+ESPLICITO = re.compile(
+    r'^(?:rara |grave )?(?:posizione|pratica|atto|rapporto|congiungimento) sessual'
+    r'|^(?:rara |grave )?perversione'
+    r'|^(?:atto di |pratica di )?masturbazione'
+    r'|^(?:chi |che )?(?:trae|prova) piacere sessuale'
+    r'|^induzione.{0,20}prostituzione|^chi.{0,20}prostituzione'
+    r'|^(?:attore|attrice).{0,24}pornograf', re.I)
+
+EPITETO = re.compile(
+    r'\b(?:insulto|epiteto|appellativo)\b.{0,30}\b(?:rivolto|per|contro|usato)\b'
+    r'|\btermine (?:dispregiativo|spregiativo|offensivo|ingiurioso)\b.{0,40}'
+    r'\b(?:usato|rivolto|per|verso|contro)\b', re.I)
+
+def esplicito(v):
+    lem = v['lemma'].lower()
+    if lem in NON_VOLGARI: return False
+    if RADICE_VOLGARE.match(lem): return True
+    d = v['def']
+    return bool(ESPLICITO.search(d) or EPITETO.search(d))
+
+# ---------------------------------------- coerenza fra esempio e lemma
+def esempio_valido(es, lemma, forme):
+    """Un esempio che non contiene la parola non e' un esempio: sulla carta
+    mostra una frase che non c'entra niente con il lemma."""
+    if not es: return False
+    t = unicodedata.normalize('NFD', es.lower())
+    t = ''.join(c for c in t if not unicodedata.combining(c))
+    radici = [radice_lemma(lemma)] + [f.lower() for f in (forme or [])]
+    return any(re.search(r'\b' + re.escape(r), t) for r in radici if len(r) >= 3)
+
 def livello(rango):
     if rango is None or rango >= FREQ_LIVELLO3: return 3
     if rango >= FREQ_LIVELLO2: return 2
@@ -245,11 +307,12 @@ def costruisci(grezzo_path, freq_path, curati_path, obiettivo):
         dom = v['dom'][:2] or inferisci_dominio(v['def'] + ' ' + ' '.join(v['defs']))
         tenute.append({
             'id': v['lemma'], 'lemma': v['lemma'], 'pos': v['pos'], 'sill': v['sill'],
-            'def': tipografia(v['def']), 'es': tipografia(v['es']) if v['es'] else '',
+            'def': tipografia(v['def']),
+            'es': tipografia(v['es']) if esempio_valido(v['es'], v['lemma'], v.get('forme')) else '',
             'sin': v['sin'][:4],
             'dom': dom or ['generale'], 'lvl': lvl, 'reg': registro(v, lvl),
             'etim': v['etim'], 'pt': round(pt, 2), 'ad': round(ad, 2), 'sc': round(sc, 2),
-            'rango': rango or 0,
+            'rango': rango or 0, 'sens': 1 if esplicito(v) else 0,
         })
 
     print('dopo i filtri: %d  (scarti: %s)' % (len(tenute), dict(scartate.most_common())))
@@ -293,7 +356,7 @@ def scrivi(voci):
 
     # 'forme' porta i participi irregolari: senza, il controllo delle frasi
     # torna a rifiutare "ho eluso" per il lemma "eludere"
-    CAMPI = ('id', 'pos', 'sill', 'def', 'es', 'sin', 'dom', 'lvl', 'reg', 'etim', 'forme')
+    CAMPI = ('id', 'pos', 'sill', 'def', 'es', 'sin', 'dom', 'lvl', 'reg', 'etim', 'forme', 'sens')
     for n, blocco in enumerate(blocchi):
         blocco.sort(key=lambda x: x['id'])
         snello = [{k: v[k] for k in CAMPI if v.get(k)} for v in blocco]
@@ -317,6 +380,7 @@ def scrivi(voci):
             'livelli': {str(k): conta_liv[k] for k in sorted(conta_liv)},
             'domini': dict(conta_dom.most_common()),
             'curati': sum(1 for v in voci if v.get('curato')),
+            'espliciti': sum(1 for v in voci if v.get('sens')),
             'fonte': 'Wikizionario italiano (CC BY-SA 3.0)',
         }, f, ensure_ascii=False, separators=(',', ':'))
         f.write(';\n')

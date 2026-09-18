@@ -45,6 +45,28 @@ CC BY-SA 3.0 è una licenza **virale sul contenuto derivato**. In pratica:
 Se in futuro il corpus dovesse diventare proprietario, le definizioni andranno
 riscritte da zero: la licenza non si può togliere.
 
+## Lessico esplicito
+
+Il Wikizionario è un dizionario completo, quindi contiene anche parole volgari e
+voci sessualmente esplicite. Un flusso che pesca a caso può metterle davanti a
+chiunque, anche in un'aula.
+
+**33 voci su 11.326 (lo 0,29%)** sono segnate con `sens` e restano fuori dal
+flusso finché non si accende l'interruttore in *Io → Lessico esplicito*. Non sono
+cancellate: sono nel corpus e tornano disponibili quando si vuole.
+
+La marcatura guarda **la parola, non la definizione**: il Wikizionario marca
+l'intera voce come volgare se anche una sola delle sue accezioni lo è, e così
+`marrone` (la castagna) e `sedurre` finivano segnati. Le radici sono ancorate
+all'inizio della parola — cercarle come sottostringhe rendeva esplicite
+`verificare`, `classificare` e `pacificare` — e c'è un elenco di omografi
+innocenti da escludere (`cazzuola`, `piscina`, `inculcare`, `troiano`,
+`zoccolo`, `introito`).
+
+**Non sono segnati**, di proposito: i termini clinici (`minzione`,
+`circoncisione`, `defecazione`) e quelli neutri su identità e orientamento
+(`omosessuale`, `poliamoroso`). Toglierli sarebbe un errore, non una cautela.
+
 ## La lista di frequenza
 
 I ranghi di frequenza vengono da

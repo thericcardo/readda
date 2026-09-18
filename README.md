@@ -85,8 +85,8 @@ node test/icone.js                                  # rigenera le icone PWA
 ```
 
 `test/e2e.js` vuole un server attivo sulla porta 8777 e Chromium; scrive le schermate
-in `scatti/`. Le due suite insieme fanno **124 asserzioni** e hanno trovato nove difetti veri,
-tutti corretti:
+in `scatti/`. Le due suite insieme fanno **138 asserzioni** e hanno trovato dodici difetti
+veri, tutti corretti:
 
 | Difetto | Perché contava |
 |---|---|
@@ -99,6 +99,9 @@ tutti corretti:
 | Stringhe in forma **decomposta** (`Gia` + accento combinante) | Si vedono uguali, ma una ricerca per «Già» non le trova |
 | Il campo `forme` non veniva esportato nei blocchi | I participi irregolari tornavano a essere rifiutati, in silenzio |
 | `radice_lemma` tagliava i suffissi da una lista, e la lista aveva un buco | Mancava `-ico`, quindi «ironico: incline all'ironia» passava il filtro anticircolare |
+| 116 esempi non contenevano la parola che dovevano illustrare | Sulla carta compariva una frase che non c'entrava nulla col lemma |
+| 5 definizioni con markup wiki sopravvissuto (`attaccate]].`) | Parentesi spaiate emerse dopo la decodifica delle entità HTML |
+| Le note legali erano rese al 16% di opacità | Un'attribuzione CC BY-SA illeggibile non soddisfa la licenza |
 
 Gli ultimi tre erano latenti: nessuno rompeva l'app quel giorno, tutti l'avrebbero rotta
 alla prima modifica. `test/prova.js` ora contiene le guardie che li impediscono di
@@ -157,6 +160,14 @@ Cosa viene scartato, e perche':
 Il filtro piu' importante e' la **trasparenza morfologica**: `distinguibile` e
 `controproducente` si ricavano da parole che gia' si conoscono, quindi impararle
 non cambia come si parla. `blandire` e `accidia` no: quelle sono il prodotto.
+
+**Lessico esplicito.** Il Wikizionario è un dizionario completo: contiene anche
+parole volgari e voci sessualmente esplicite, e un flusso casuale può metterle
+davanti a chiunque. 33 voci (lo 0,29%) sono segnate e restano fuori dal flusso
+finché non si accende l'interruttore in *Io*. La marcatura guarda la parola, non
+la definizione, ed esclude a mano gli omografi innocenti; i termini clinici e
+quelli neutri su identità e orientamento **non** sono segnati. Dettagli in
+[FONTI.md](FONTI.md).
 
 **Il livello** viene dal rango di frequenza su OpenSubtitles: 1.500-20.000 e'
 livello 1, fino a 80.000 livello 2, oltre (o assente) livello 3. La fascia

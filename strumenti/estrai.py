@@ -38,6 +38,9 @@ def pulisci(t, lemma=None):
     t = RE_HTML.sub(' ', t)
     t = _html.unescape(_html.unescape(t))     # doppia: il wiki a volte le annida
     t = RE_HTML.sub(' ', t)                    # tag emersi dopo la decodifica
+    t = RE_WLINK2.sub(r'\1', t)                # link emersi dopo la decodifica
+    t = RE_WLINK1.sub(r'\1', t)
+    t = t.replace('[[', '').replace(']]', '').replace('{{', '').replace('}}', '')
     return RE_SPAZI.sub(' ', t).strip(' ;:,')
 
 # ---------- categorie grammaticali ----------

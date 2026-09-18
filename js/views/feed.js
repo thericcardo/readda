@@ -45,7 +45,7 @@ Readda.Feed = (function () {
 
     // il corpus vive in blocchi: se ne carica una manciata, non tutto
     Readda.Corpus.allarga(4, function () {
-      coda = Readda.Srs.coda(S.profilo(), S.tutteLeParole(), 120);
+      coda = Readda.Srs.coda(S.profilo(), S.tutteLeParole(), 120, S.impostazioni().esplicito);
       mostra();
     });
   }
@@ -63,7 +63,7 @@ Readda.Feed = (function () {
     Readda.Corpus.allarga(3, function (ancora) {
       rifornendo = false;
       if (!ancora) return;
-      var nuova = Readda.Srs.coda(S.profilo(), S.tutteLeParole(), 120);
+      var nuova = Readda.Srs.coda(S.profilo(), S.tutteLeParole(), 120, S.impostazioni().esplicito);
       var visti = {};
       for (var i = 0; i <= indice && i < coda.length; i++) visti[coda[i].id] = true;
       for (var j = 0; j < nuova.length; j++) {

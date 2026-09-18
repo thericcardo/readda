@@ -60,6 +60,18 @@ Readda.Io = (function () {
         '</div>' +
 
         '<div class="riquadro">' +
+          '<div class="riga"><div style="flex:1">' +
+            '<h3>Lessico esplicito</h3>' +
+            '<p>' + U.esc(Readda.Corpus.manifesto().espliciti || 0) + ' voci volgari o sessualmente ' +
+              'esplicite restano fuori dal flusso. Sono nel corpus, non cancellate: ' +
+              'accendi per vederle anche tu.</p>' +
+          '</div>' +
+          '<button class="interruttore" id="sw-esplicito" role="switch" ' +
+            'aria-checked="' + (S.impostazioni().esplicito === true) + '" ' +
+            'aria-label="Lessico esplicito"></button></div>' +
+        '</div>' +
+
+        '<div class="riquadro">' +
           '<h3>Interessi</h3>' +
           '<p>Rifai le tre domande per cambiare quello che ti arriva nel flusso.</p>' +
           '<button class="btn btn-filo btn-pieno" id="rifai">Rivedi le preferenze</button>' +
@@ -97,6 +109,13 @@ Readda.Io = (function () {
     U.su('[data-dose]', 'click', function (e) {
       S.imposta('dose', parseInt(e.currentTarget.getAttribute('data-dose'), 10));
       disegna();
+    });
+    U.uno('#sw-esplicito').addEventListener('click', function () {
+      var sw = U.uno('#sw-esplicito');
+      var acceso = sw.getAttribute('aria-checked') === 'true';
+      S.imposta('esplicito', !acceso);
+      sw.setAttribute('aria-checked', String(!acceso));
+      U.brindisi(acceso ? 'Lessico esplicito escluso dal flusso' : 'Lessico esplicito incluso');
     });
     U.uno('#rifai').addEventListener('click', function () { Readda.App.vai('#/inizio'); });
     U.uno('#esporta').addEventListener('click', apriEsporta);

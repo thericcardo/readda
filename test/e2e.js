@@ -230,6 +230,17 @@ function gruppo(n) { console.log('\n' + n); }
   await page.click('.tab[data-rotta="#/io"]');
   await page.waitForSelector('.numeri');
 
+  ok('l\'interruttore del lessico esplicito parte spento',
+     await page.getAttribute('#sw-esplicito', 'aria-checked') === 'false');
+  await page.click('#sw-esplicito');
+  await page.waitForTimeout(250);
+  ok('si accende e resta acceso',
+     await page.getAttribute('#sw-esplicito', 'aria-checked') === 'true' &&
+     await page.evaluate(() => Readda.Store.impostazioni().esplicito) === true);
+  await page.click('#sw-esplicito');
+  await page.waitForTimeout(250);
+  ok('si rispegne', await page.evaluate(() => Readda.Store.impostazioni().esplicito) === false);
+
   // percorso mai esercitato prima: accensione e spegnimento dei promemoria
   const spegnimento = await page.evaluate(() => {
     try {
