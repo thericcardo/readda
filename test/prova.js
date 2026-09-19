@@ -166,13 +166,73 @@ ok('reimportazione riuscita', imp.ok && imp.nick === 'Riccardo');
 ok('nessuna parola persa', Object.keys(S.tutteLeParole()).length === quante);
 ok('rifiuta una stringa spazzatura', S.importa('non-un-codice').ok === false);
 
+gruppo('Backup malformati e account di versioni precedenti');
+{
+  /* Il backup e' l'unica rete di sicurezza di un'app senza server. Se il
+     ripristino puo' rompere l'app, la rete non c'e'. */
+  const impacchetta = o => ctx.btoa(unescape(encodeURIComponent(JSON.stringify(o))));
+
+  const rotti = [
+    ['stringa vuota', ''],
+    ['spazzatura', 'non-un-codice'],
+    ['base64 che non e\' JSON', ctx.btoa('questo non e\' json')],
+    ['JSON senza dati', impacchetta({ v: 1 })],
+    ['profilo senza nickname', impacchetta({ v: 1, dati: { profilo: {} } })],
+    ['nickname non testuale', impacchetta({ v: 1, dati: { profilo: { nick: 42 } } })],
+    ['nickname di un carattere', impacchetta({ v: 1, dati: { profilo: { nick: 'x' } } })],
+    ['dati non oggetto', impacchetta({ v: 1, dati: 'niente' })]
+  ];
+  const esplosi = [], accettati = [];
+  rotti.forEach(function (c) {
+    let r;
+    try { r = S.importa(c[1]); } catch (e) { esplosi.push(c[0] + ': ' + e.message); return; }
+    if (r.ok) accettati.push(c[0]);
+    else if (!r.err) esplosi.push(c[0] + ': rifiutato senza messaggio');
+  });
+  ok('nessun backup malformato fa saltare l\'app', esplosi.length === 0, esplosi);
+  ok('nessun backup malformato viene accettato', accettati.length === 0, accettati);
+
+  /* Un account scritto da una versione precedente puo' non avere `usi`.
+     Il ripasso e la schermata Io leggevano `p.usi.length` senza difese. */
+  const vecchio = impacchetta({
+    v: 1,
+    dati: {
+      profilo: { nick: 'Antico' },
+      parole: {
+        blandire: { stato: 'passiva' },                    // senza usi, box, prox
+        coacervo: { stato: 'ignota', box: 2 },
+        rumore:   { stato: 'boh' },                        // stato inesistente
+        vuota:    null
+      }
+    }
+  });
+  const r = S.importa(vecchio);
+  ok('un account senza i campi nuovi si importa', r.ok === true, r.err);
+  const parole = S.tutteLeParole();
+  ok('ogni parola ha un elenco di usi',
+     Object.keys(parole).every(k => Array.isArray(parole[k].usi)));
+  ok('ogni parola ha i contatori numerici',
+     Object.keys(parole).every(k => typeof parole[k].box === 'number' &&
+       typeof parole[k].prox === 'number' && typeof parole[k].ok === 'number'));
+  ok('le parole senza uno stato valido vengono scartate',
+     !parole.rumore && !parole.vuota && !!parole.blandire, Object.keys(parole));
+  ok('le impostazioni mancanti prendono il valore di partenza',
+     S.impostazioni().dose === 15 && S.impostazioni().esplicito === false, S.impostazioni());
+  ok('un profilo senza codice ne riceve uno',
+     /^[a-z]+(-[a-z]+){3}$/.test(S.profilo().codice), S.profilo().codice);
+  // le scadenze devono poter girare su un account cosi'
+  ok('il ripasso sa leggere un account vecchio', Array.isArray(R.scadenze(parole)));
+  S.entra('Riccardo');
+}
+
 gruppo('Multiutente sullo stesso dispositivo');
 S.registra('Ospite');
 S.entra('Ospite');
 ok('il nuovo account parte pulito', Object.keys(S.tutteLeParole()).length === 0);
 S.entra('Riccardo');
 ok('i dati del primo utente sono intatti', Object.keys(S.tutteLeParole()).length === quante);
-ok('entrambi i nickname sono elencati', S.elencoNick().length === 2, S.elencoNick());
+ok('entrambi i nickname sono elencati',
+   ['Riccardo', 'Ospite'].every(n => S.elencoNick().indexOf(n) >= 0), S.elencoNick());
 
 gruppo('Igiene del sorgente');
 {

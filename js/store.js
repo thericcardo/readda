@@ -32,6 +32,59 @@ Readda.Store = (function () {
     };
   }
 
+  /* ---------- forma dei dati ----------
+   * Un account puo' arrivare da una versione precedente dell'app o da un
+   * backup scritto a mano, e in quel caso gli manca qualcosa. Finora ogni
+   * vista se la cavava per conto suo: la raccolta metteva le sue difese
+   * (`p.usi = p.usi || []`), il ripasso e la schermata Io no, e leggevano
+   * `p.usi.length` su un campo che poteva non esserci. Tre difese diverse
+   * per lo stesso problema vuol dire due punti scoperti.
+   *
+   * Qui c'e' un posto solo: si passa di qui una volta, quando l'account si
+   * carica, e da li' in poi la forma e' garantita. */
+  function normalizzaParola(p) {
+    if (!p || typeof p !== 'object') return null;
+    if (!Array.isArray(p.usi)) p.usi = [];
+    if (typeof p.box !== 'number') p.box = 0;
+    if (typeof p.prox !== 'number') p.prox = 0;
+    if (typeof p.visto !== 'number') p.visto = 0;
+    if (typeof p.ok !== 'number') p.ok = 0;
+    if (typeof p.ko !== 'number') p.ko = 0;
+    if (typeof p.ultimo !== 'number') p.ultimo = p.dal || 0;
+    p.bluff = !!p.bluff;
+    // senza uno stato la parola non appartiene a nessun elenco: e' rumore
+    if (['ignota', 'passiva', 'attiva'].indexOf(p.stato) < 0) return null;
+    return p;
+  }
+
+  function normalizzaStato(s) {
+    if (!s || typeof s !== 'object' || !s.profilo || typeof s.profilo.nick !== 'string') return null;
+    var base = vuoto(s.profilo.nick, s.profilo.codice || generaCodice());
+    var k;
+    for (k in base.profilo) {
+      if (base.profilo.hasOwnProperty(k) && s.profilo[k] === undefined) s.profilo[k] = base.profilo[k];
+    }
+    if (!Array.isArray(s.profilo.interessi)) s.profilo.interessi = [];
+
+    if (!s.parole || typeof s.parole !== 'object') s.parole = {};
+    for (var id in s.parole) {
+      if (!s.parole.hasOwnProperty(id)) continue;
+      if (!normalizzaParola(s.parole[id])) delete s.parole[id];
+    }
+
+    if (!s.stats || typeof s.stats !== 'object') s.stats = base.stats;
+    if (!Array.isArray(s.stats.giorni)) s.stats.giorni = [];
+    if (typeof s.stats.striscia !== 'number') s.stats.striscia = 0;
+
+    if (!s.impostazioni || typeof s.impostazioni !== 'object') s.impostazioni = base.impostazioni;
+    for (k in base.impostazioni) {
+      if (base.impostazioni.hasOwnProperty(k) && s.impostazioni[k] === undefined) {
+        s.impostazioni[k] = base.impostazioni[k];
+      }
+    }
+    return s;
+  }
+
   /* ---------- codice di ripristino ---------- */
   var SILLABE = ['bra','cor','del','fio','gua','lan','mer','nis','ora','pel','rin','sal','tor','vel','zaf','cam','dun','fal'];
   function generaCodice() {
@@ -70,7 +123,9 @@ Readda.Store = (function () {
     var tutti = leggiTutti();
     var chiave = n.toLowerCase();
     if (!tutti[chiave]) return { ok: false, err: 'Nickname non trovato su questo dispositivo.' };
-    stato = tutti[chiave];
+    var s = normalizzaStato(tutti[chiave]);
+    if (!s) return { ok: false, err: 'I dati di questo account sono illeggibili.' };
+    stato = s;
     nick = chiave;
     ricorda(chiave);
     return { ok: true };
@@ -81,7 +136,9 @@ Readda.Store = (function () {
     if (!chiave) return false;
     var tutti = leggiTutti();
     if (!tutti[chiave]) return false;
-    stato = tutti[chiave]; nick = chiave;
+    var s = normalizzaStato(tutti[chiave]);
+    if (!s) return false;
+    stato = s; nick = chiave;
     return true;
   }
 
@@ -92,7 +149,10 @@ Readda.Store = (function () {
 
   function elencoNick() {
     var t = leggiTutti(), out = [];
-    for (var k in t) if (t.hasOwnProperty(k)) out.push(t[k].profilo.nick);
+    for (var k in t) {
+      // un account rotto non deve impedire l'elenco degli altri
+      if (t.hasOwnProperty(k) && t[k] && t[k].profilo && t[k].profilo.nick) out.push(t[k].profilo.nick);
+    }
     return out;
   }
 
@@ -215,7 +275,7 @@ Readda.Store = (function () {
   }
 
   function fatteOggi() {
-    var g = oggiISO(), n = 0, inizio = new Date(); inizio.setHours(0, 0, 0, 0);
+    var n = 0, inizio = new Date(); inizio.setHours(0, 0, 0, 0);
     for (var id in stato.parole) {
       if (stato.parole.hasOwnProperty(id) && stato.parole[id].ultimo >= inizio.getTime()) n++;
     }
@@ -223,11 +283,8 @@ Readda.Store = (function () {
   }
 
   /* ---------- impostazioni ---------- */
-  function impostazioni() {
-    // gli account creati prima che l'impostazione esistesse non ce l'hanno
-    if (stato.impostazioni.esplicito === undefined) stato.impostazioni.esplicito = false;
-    return stato.impostazioni;
-  }
+  // i campi mancanti li riempie normalizzaStato() al caricamento dell'account
+  function impostazioni() { return stato.impostazioni; }
   function imposta(k, v) { stato.impostazioni[k] = v; salva(); }
 
   /* ---------- esportazione / importazione ---------- */
@@ -236,18 +293,30 @@ Readda.Store = (function () {
     return btoa(unescape(encodeURIComponent(JSON.stringify(pacco))));
   }
 
+  /* Il backup e' l'unica rete di sicurezza di un'app senza server: se il
+   * ripristino puo' rompere l'app, la rete non c'e'. Prima bastava un pacco
+   * con `profilo` ma senza `nick` per far saltare tutto con un TypeError e
+   * lasciare la schermata bianca, invece di dire "codice non valido". */
   function importa(stringa) {
     var pacco;
-    try { pacco = JSON.parse(decodeURIComponent(escape(atob(stringa.trim())))); }
+    try { pacco = JSON.parse(decodeURIComponent(escape(atob(String(stringa || '').trim())))); }
     catch (e) { return { ok: false, err: 'Codice non leggibile.' }; }
-    if (!pacco || !pacco.dati || !pacco.dati.profilo) return { ok: false, err: 'Codice non valido.' };
+    if (!pacco || typeof pacco !== 'object' || !pacco.dati) {
+      return { ok: false, err: 'Codice non valido.' };
+    }
+    var s = normalizzaStato(pacco.dati);
+    if (!s) return { ok: false, err: 'Il backup non contiene un account leggibile.' };
+    var nome = s.profilo.nick.trim();
+    if (nome.length < 2 || nome.length > 24) {
+      return { ok: false, err: 'Il backup ha un nickname non valido.' };
+    }
     var tutti = leggiTutti();
-    var chiave = pacco.dati.profilo.nick.toLowerCase();
-    tutti[chiave] = pacco.dati;
-    scriviTutti(tutti);
-    stato = pacco.dati; nick = chiave;
+    var chiave = nome.toLowerCase();
+    tutti[chiave] = s;
+    if (!scriviTutti(tutti)) return { ok: false, err: 'Memoria del browser non disponibile.' };
+    stato = s; nick = chiave;
     ricorda(chiave);
-    return { ok: true, nick: pacco.dati.profilo.nick };
+    return { ok: true, nick: nome };
   }
 
   function cancellaAccount() {
