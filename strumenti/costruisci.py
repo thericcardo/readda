@@ -293,7 +293,7 @@ def costruisci(grezzo_path, freq_path, curati_path, obiettivo):
         coda = rango is None or rango > FREQ_MAX
         ad = aderenza(v, rango)
         sc = scheda(v)
-        if ad < 2.5:
+        if ad < 1.5:   # 2.5 lasciava fuori troppo lessico generale buono
             scartate['non e\' lessico da prodotto'] += 1; continue
         pt = ad * 2.0 + sc
         if coda:

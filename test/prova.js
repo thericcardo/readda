@@ -64,12 +64,15 @@ for (let g = 0; g < 30; g++) {
   for (const x of R.coda(prof, storia, 15, false)) {
     storia[x.id] = { stato: 'attiva' };
     const suo = x.dom.some(d => d === prof.lavoro || prof.interessi.includes(d));
-    mix[suo ? 'tema' : (x.dom[0] === 'generale' ? 'generale' : 'altro')]++;
+    // stessa definizione che usa la coda, presa da li': duplicarla la fa divergere
+    mix[suo ? 'tema' : (R.generale(x) ? 'generale' : 'altro')]++;
   }
 }
 const totMix = mix.tema + mix.generale + mix.altro;
 ok('i temi di chi legge sono circa il 22%', Math.abs(mix.tema / totMix - 0.22) < 0.07,
    (100 * mix.tema / totMix).toFixed(0) + '%');
+ok('"generale" vuol dire "non specialistico", non "senza dominio"',
+   R.larghi().indexOf('emozioni') >= 0 && R.larghi().indexOf('medicina') < 0);
 ok('il lessico generale domina il flusso, circa il 70%', Math.abs(mix.generale / totMix - 0.70) < 0.08,
    (100 * mix.generale / totMix).toFixed(0) + '%');
 ok('resta spazio per l\'imprevisto', mix.altro / totMix > 0.03,

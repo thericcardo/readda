@@ -67,6 +67,18 @@ Readda.Srs = (function () {
    */
   var QUOTE = { tema: 0.22, generale: 0.70, altro: 0.08 };
 
+  /* "Generale" non vuol dire "senza dominio": vuol dire "non specialistico".
+   * Emozioni, tempo, lingua, pensiero, natura, storia, societa' e scuola sono
+   * categorie umane, non mestieri: "sussulto" e' etichettato emozioni e
+   * "varcare" tempo, ma sono lessico che serve a chiunque. Le etichette
+   * restano, e continuano a valere per lo strato dei temi: una parola puo'
+   * essere insieme generale e in tema con chi legge.
+   * Restano specialistici solo i mestieri veri: medicina, diritto, tecnologia,
+   * scienza, lavoro. Cosi' lo strato generale passa da 3.419 a oltre 9.000
+   * voci, mentre abbassare i filtri non lo portava oltre 4.500. */
+  var LARGHI = ['generale', 'emozioni', 'tempo', 'lingua', 'pensiero',
+                'natura', 'storia', 'politica', 'scuola', 'arte', 'cucina'];
+
   function coda(profilo, parole, quante, esplicito) {
     var interessi = profilo.interessi || [];
     var lavoro = profilo.lavoro;
@@ -82,7 +94,7 @@ Readda.Srs = (function () {
       if (l.lvl > tetto + 1) return;
 
       var suo = l.dom.some(function (d) { return d === lavoro || interessi.indexOf(d) >= 0; });
-      var generico = l.dom.length === 1 && l.dom[0] === 'generale';
+      var generico = generale(l);
       var strato = suo ? 'tema' : (generico ? 'generale' : 'altro');
 
       // dentro lo strato conta la vicinanza al livello scelto, piu' un po' di
@@ -162,8 +174,15 @@ Readda.Srs = (function () {
     });
   }
 
+  /* Esposto perche' i test misurino la stessa definizione che usa la coda:
+     duplicarla altrove le fa divergere in silenzio. */
+  function generale(l) {
+    return l.dom.every(function (d) { return LARGHI.indexOf(d) >= 0; });
+  }
+
   return {
     intervallo: intervallo, scadenze: scadenze, distrattori: distrattori,
+    generale: generale, larghi: function () { return LARGHI.slice(); },
     coda: coda, contiene: contiene, radice: radice, radici: radici, mescola: mescola
   };
 })();

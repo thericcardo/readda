@@ -129,9 +129,9 @@ js/app.js                instradamento via hash
 sw.js                    guscio offline
 ```
 
-**Il corpus. 11.326 voci**, di cui 134 scritte a mano e 11.192 ricavate dal
+**Il corpus. 13.589 voci**, di cui 134 scritte a mano e 13.455 ricavate dal
 Wikizionario italiano. Non e' il Wikizionario travasato: di 782.769 pagine lette
-ne sopravvive l'1,4%, perche' la pipeline tiene solo cio' che serve a questo
+ne sopravvive l'1,7%, perche' la pipeline tiene solo cio' che serve a questo
 prodotto. Ogni voce porta categoria grammaticale, sillabazione con accento
 tonico (`de·no·ta·zió·ne`), definizione, sinonimi, dominio, registro, livello di
 rarita' e, dove c'e', un esempio d'uso.
@@ -204,11 +204,23 @@ prodotto, non un vincolo tecnico. Con il generale al 70% l'app insegna soprattut
 a **parlare meglio**, non a essere più precisi nel proprio mestiere; alzando la
 quota dei temi si ottiene l'opposto. Le due cose tirano in direzioni contrarie.
 
-Misurato simulando l'uso quotidiano: a queste quote lo strato generale, che vale
-3.419 voci, **scende sotto il 55% dopo 309 giorni** (le altre le ha già mostrate
-tutte), e il flusso si esaurisce del tutto a **753 giorni**. Quando uno strato si
-svuota la ridistribuzione lo riempie dagli altri: il flusso non si ferma, si
-sbilancia verso i domini.
+**«Generale» non vuol dire «senza dominio»: vuol dire «non specialistico».**
+`sussulto` è etichettato `emozioni` e `varcare` è `tempo`, ma sono lessico che
+serve a chiunque. Restano specialistici solo i mestieri veri — medicina,
+diritto, tecnologia, scienza, lavoro — mentre emozioni, tempo, lingua, pensiero,
+natura, storia, società, scuola, arte e cucina sono categorie umane. Le etichette
+restano e continuano a valere per lo strato dei temi: una parola può essere
+insieme generale e in tema con chi legge.
+
+Questa ridefinizione porta lo strato generale **da 3.419 a 8.660 voci** senza
+toccare un solo dato. Abbassare i filtri, che era la strada ovvia, non lo portava
+oltre 4.500 nemmeno ammettendo quasi tutto: il tetto non stava nei filtri, stava
+nella definizione.
+
+Misurato simulando l'uso quotidiano: lo strato generale **scende sotto il 55%
+dopo 783 giorni** — 26 mesi, contro i 10 di prima. Quando uno strato si svuota la
+ridistribuzione lo riempie dagli altri: il flusso non si ferma, si sbilancia
+verso i domini.
 
 Dentro ogni strato l'estrazione è **pesata, non ordinata** (chiave di
 Efraimidis-Spirakis). Ordinare rifarebbe del peso un filtro un livello più in
