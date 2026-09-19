@@ -62,7 +62,30 @@ Readda.Ui = (function () {
                      '<div class="maniglia" aria-hidden="true"></div>' + contenuto + '</div>';
     document.body.appendChild(velo);
 
-    function onTasto(e) { if (e.key === 'Escape') { e.preventDefault(); chiudi(); } }
+    var FUOCABILI = 'button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])';
+
+    /* `aria-modal="true"` dice alle tecnologie assistive che il resto della
+     * pagina non esiste. Se poi il tab ci esce davvero, chi naviga da
+     * tastiera finisce a pilotare comandi sotto il velo, invisibili e
+     * dichiarati inerti. Dichiararlo senza chiudere il giro e' peggio che
+     * non dichiararlo. */
+    function trattieni(e) {
+      var dentro = velo.querySelector('.foglio');
+      var nodi = [].slice.call(dentro.querySelectorAll(FUOCABILI))
+        .filter(function (n) { return !n.disabled && n.offsetParent !== null; });
+      if (!nodi.length) { e.preventDefault(); dentro.focus(); return; }
+      var primo = nodi[0], ultimo = nodi[nodi.length - 1];
+      if (e.shiftKey && (document.activeElement === primo || document.activeElement === dentro)) {
+        e.preventDefault(); ultimo.focus();
+      } else if (!e.shiftKey && document.activeElement === ultimo) {
+        e.preventDefault(); primo.focus();
+      }
+    }
+
+    function onTasto(e) {
+      if (e.key === 'Escape') { e.preventDefault(); chiudi(); }
+      else if (e.key === 'Tab') trattieni(e);
+    }
 
     var chiuso = false;
     function chiudi() {
@@ -70,8 +93,16 @@ Readda.Ui = (function () {
       chiuso = true;
       document.removeEventListener('keydown', onTasto);
       velo.style.animation = 'sfuma .22s reverse both';
-      setTimeout(function () { velo.remove(); }, 200);
-      if (prima && prima.focus) prima.focus();
+      setTimeout(function () {
+        velo.remove();
+        /* Il fuoco torna dopo che il velo se n'e' andato: prima, per due
+         * decimi di secondo, sarebbe stato su un comando ancora coperto, e
+         * un Invio l'avrebbe azionato senza che si vedesse. E solo se quel
+         * nodo esiste ancora - chi chiude il foglio spesso ridisegna la
+         * schermata subito dopo, e a quel punto non c'e' piu' niente su cui
+         * tornare. */
+        if (prima && prima.focus && document.contains(prima)) prima.focus();
+      }, 200);
     }
 
     velo.addEventListener('click', function (e) { if (e.target === velo) chiudi(); });

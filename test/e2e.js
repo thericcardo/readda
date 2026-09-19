@@ -293,9 +293,23 @@ function gruppo(n) { console.log('\n' + n); }
       ok('il fuoco non finisce su un bottone che fa qualcosa',
          await page.evaluate(() => document.activeElement.tagName !== 'BUTTON'),
          await page.evaluate(() => document.activeElement.tagName));
+
+      /* Il foglio si dichiara modale: se poi il tab ci esce davvero, chi
+         naviga da tastiera finisce a pilotare comandi sotto il velo. */
+      for (let t = 0; t < 8; t++) await page.keyboard.press('Tab');
+      ok('otto tab non portano fuori dal foglio',
+         await page.evaluate(() => !!document.activeElement.closest('.foglio')),
+         await page.evaluate(() => document.activeElement.className ||
+                                   document.activeElement.tagName));
+      for (let t = 0; t < 4; t++) await page.keyboard.press('Shift+Tab');
+      ok('e nemmeno quattro all\'indietro',
+         await page.evaluate(() => !!document.activeElement.closest('.foglio')));
       await page.keyboard.press('Escape');
       await page.waitForTimeout(320);
       ok('Esc lo chiude', await page.locator('.foglio').count() === 0);
+      // il fuoco torna dopo la sparizione del velo, non prima
+      ok('il velo se n\'e\' andato prima che il fuoco torni',
+         await page.locator('.velo').count() === 0);
       const ritorno = await page.evaluate(() =>
         document.activeElement && document.activeElement.getAttribute
           ? document.activeElement.getAttribute('data-id') : null);
