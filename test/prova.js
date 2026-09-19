@@ -457,9 +457,70 @@ gruppo('Leggibilita\' delle note obbligatorie');
   ok('l\'attribuzione della licenza e\' nel sorgente', /CC BY-SA 3\.0/.test(io));
   ok('rimanda alla licenza con un collegamento', /creativecommons\.org\/licenses\/by-sa\/3\.0/.test(io));
   ok('dice che la clausola e\' virale', /mantenere la stessa licenza/.test(io));
-  // --inchiostro-4 sta al 16% di opacita': invisibile, inaccettabile per una nota legale
   ok('nessuna nota resa col grigio piu\' tenue', !/inchiostro-4/.test(io),
      (io.match(/[^']*inchiostro-4[^']*/g) || []).slice(0, 2));
+}
+
+gruppo('Contrasto del sistema visivo');
+{
+  /* Il README elenca fra i difetti corretti «le note legali erano rese al
+     16% di opacita'». La correzione pero' e' stata fatta a occhio e si e'
+     fermata al 40%, che sul fondo delle carte vale 3,0:1 — sotto il 4,5:1
+     che serve al testo normale. Un'attribuzione difficile da leggere non
+     soddisfa la licenza piu' di una illeggibile, e la differenza fra le due
+     non si vede guardando: si calcola. */
+  const fsm = require('fs'), pth = require('path');
+  const css = fsm.readFileSync(pth.join(__dirname, '..', 'assets/styles.css'), 'utf8');
+
+  function variabile(nome) {
+    const m = css.match(new RegExp('--' + nome + ':\\s*([^;]+);'));
+    return m ? m[1].trim() : null;
+  }
+  function colore(v) {
+    let m = v.match(/^#([0-9a-f]{6})$/i);
+    if (m) return [parseInt(m[1].slice(0, 2), 16), parseInt(m[1].slice(2, 4), 16),
+                   parseInt(m[1].slice(4, 6), 16), 1];
+    m = v.match(/^rgba?\(\s*(\d+)\s*,\s*(\d+)\s*,\s*(\d+)\s*(?:,\s*([\d.]+)\s*)?\)$/);
+    if (m) return [+m[1], +m[2], +m[3], m[4] === undefined ? 1 : parseFloat(m[4])];
+    return null;
+  }
+  const canale = c => { c /= 255; return c <= 0.03928 ? c / 12.92 : Math.pow((c + 0.055) / 1.055, 2.4); };
+  const luce = c => 0.2126 * canale(c[0]) + 0.7152 * canale(c[1]) + 0.0722 * canale(c[2]);
+  const sopra = (f, b) => [0, 1, 2].map(i => f[i] * f[3] + b[i] * (1 - f[3]));
+  function rapporto(f, b) {
+    const a = luce(sopra(f, b)), z = luce(b);
+    return (Math.max(a, z) + 0.05) / (Math.min(a, z) + 0.05);
+  }
+
+  const FONDI = ['fondo', 'fondo-alto', 'carta', 'carta-alta', 'carta-top'];
+  const TESTO = ['inchiostro', 'inchiostro-2', 'inchiostro-3'];
+  const ACCENTI = ['oro', 'oro-tenue', 'rosa', 'salvia'];
+  const AA = 4.5;
+
+  const letti = TESTO.concat(ACCENTI, FONDI).filter(n => !colore(variabile(n) || ''));
+  ok('tutte le variabili di colore si leggono dal foglio di stile',
+     letti.length === 0, letti);
+
+  const scarsi = [];
+  TESTO.concat(ACCENTI).forEach(function (t) {
+    FONDI.forEach(function (f) {
+      const r = rapporto(colore(variabile(t)), colore(variabile(f)));
+      if (r < AA) scarsi.push(t + ' su ' + f + ': ' + r.toFixed(2) + ':1');
+    });
+  });
+  ok('ogni colore di testo supera il 4,5:1 su ogni fondo del sistema',
+     scarsi.length === 0, scarsi);
+
+  /* --inchiostro-4 sta all'1,6:1: e' un valore da bordi e separatori. Se
+     ricompare dopo un `color:` e' tornato a essere testo invisibile. */
+  const comeTesto = (css.match(/color:\s*var\(--inchiostro-4\)/g) || []);
+  ok('il grigio da bordi non viene usato per il testo', comeTesto.length === 0, comeTesto);
+
+  const viste = ['accesso', 'profilo', 'feed', 'ripasso', 'collezione', 'io'];
+  const sporche = viste.filter(v =>
+    /color:\s*var\(--inchiostro-4\)/.test(
+      fsm.readFileSync(pth.join(__dirname, '..', 'js/views/' + v + '.js'), 'utf8')));
+  ok('nemmeno negli stili scritti dentro le viste', sporche.length === 0, sporche);
 }
 
 gruppo('Verbi irregolari nel controllo delle frasi');

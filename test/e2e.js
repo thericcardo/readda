@@ -160,10 +160,20 @@ function gruppo(n) { console.log('\n' + n); }
   await page.click('.voce');
   await page.waitForSelector('.foglio');
   ok('il dettaglio si apre in un foglio', await page.isVisible('.foglio .lemma'));
+  // il foglio sale in tre decimi di secondo: senza l'attesa la schermata
+  // fotografava un pannello a meta' strada, quasi invisibile
+  await page.waitForTimeout(420);
   await page.screenshot({ path: path.join(SCATTI, '6-dettaglio.png') });
-  await page.keyboard.press('Escape');
+
+  // le due vie d'uscita, una alla volta: prima il tocco fuori
   await page.click('.velo', { position: { x: 10, y: 10 } });
   await page.waitForTimeout(300);
+  ok('toccare fuori chiude il foglio', await page.locator('.foglio').count() === 0);
+  await page.click('.voce');
+  await page.waitForSelector('.foglio');
+  await page.keyboard.press('Escape');
+  await page.waitForTimeout(300);
+  ok('e anche Esc', await page.locator('.foglio').count() === 0);
 
   gruppo('Ripasso a produzione');
   // porto a scadenza tutte le parole passive

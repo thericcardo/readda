@@ -21,7 +21,14 @@
 
   --inchiostro:   #F3F1E8;
   --inchiostro-2: rgba(243,241,232,.66);
-  --inchiostro-3: rgba(243,241,232,.40);
+  /* .58 e non .40: sotto quella soglia il contrasto con --carta-top scende a
+     3,0:1, e questo e' il livello con cui sono scritte le note piccole -
+     l'attribuzione della licenza compresa. Il progetto ha gia' incontrato
+     questo difetto una volta, al 16%, e l'ha corretto a occhio fermandosi
+     ancora sotto il minimo. Misurato, non stimato: test/dati.js calcola i
+     rapporti dai valori qui sopra. */
+  --inchiostro-3: rgba(243,241,232,.58);
+  /* usato solo per bordi e separatori, mai per testo */
   --inchiostro-4: rgba(243,241,232,.16);
 
   --filo:         rgba(255,216,95,.13);
@@ -347,9 +354,12 @@ textarea.campo{resize:none;line-height:1.6;min-height:104px}
 .az-attiva{grid-column:1/-1;flex-direction:row;gap:10px;padding:13px;color:var(--inchiostro-2)}
 .az-attiva small{color:var(--inchiostro-3)}
 
+/* --inchiostro-4 sta all'1,6:1 sul fondo: e' un valore da bordi, e qui era
+   l'unico testo che lo usava. Fra tutti i testi da rendere invisibili, la
+   riga che spiega che esistono le scorciatoie da tastiera era la peggiore. */
 .scorciatoie{
   flex:none;padding:10px 0 6px;
-  text-align:center;font-size:10px;color:var(--inchiostro-4);letter-spacing:.06em;
+  text-align:center;font-size:10px;color:var(--inchiostro-3);letter-spacing:.06em;
 }
 /* su schermi bassi le scorciatoie sono il primo sacrificio */
 @media (max-height:680px){
