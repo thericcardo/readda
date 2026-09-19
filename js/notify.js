@@ -44,12 +44,13 @@ Readda.Notifiche = (function () {
   }
 
   function messaggio(d) {
-    if (d.produzione > 0) {
-      var s = Readda.Srs.scadenze(Readda.Store.tutteLeParole())
-        .filter(function (x) { return x.tipo === 'produzione'; })[0];
-      var l = Readda.Ui.lemmaPerId(s.id);
+    // `dovute()` ha gia' l'elenco: ricalcolarlo qui lo faceva divergere, e
+    // bastava che nel frattempo cambiasse per leggere `undefined.id`
+    var prima = (d.elenco || []).filter(function (x) { return x.tipo === 'produzione'; })[0];
+    if (d.produzione > 0 && prima) {
+      var l = Readda.Ui.lemmaPerId(prima.id);
       return {
-        titolo: 'L\'hai usata, «' + (l ? l.lemma : s.id) + '»?',
+        titolo: 'L\'hai usata, «' + (l ? l.lemma : prima.id) + '»?',
         corpo: 'Scrivi una frase vera in cui l\'hai detta o scritta. Se non e\' successo, va bene: riprova oggi.'
       };
     }
@@ -59,14 +60,31 @@ Readda.Notifiche = (function () {
     };
   }
 
+  /* L'ora scelta in Io era salvata e non la leggeva nessuno: con la scheda
+   * in secondo piano il controllo partiva ogni cinque minuti dalla mattina
+   * alla notte. Adesso la finestra e' di due ore intorno all'ora scelta, e
+   * il promemoria e' uno al giorno: due volte lo stesso giorno non e' un
+   * promemoria, e' un assillo. */
+  var FINESTRA_ORE = 2;
+
+  function nellaFinestra(ora, adesso) {
+    var scarto = adesso - ora;
+    if (scarto < 0) scarto += 24;              // dopo mezzanotte per un'ora serale
+    return scarto < FINESTRA_ORE;
+  }
+
   function controlla() {
     if (!Readda.Store.caricato()) return;
-    if (!Readda.Store.impostazioni().notifiche) return;
+    var imp = Readda.Store.impostazioni();
+    if (!imp.notifiche) return;
     if (document.visibilityState === 'visible') return;  // se sei dentro, non ti disturbo
+    if (!nellaFinestra(imp.oraPromemoria, new Date().getHours())) return;
+    if (Readda.Store.avvisatoOggi()) return;
     var d = dovute();
     if (d.totale === 0) return;
     var m = messaggio(d);
     invia(m.titolo, m.corpo);
+    Readda.Store.segnaAvviso();
   }
 
   function avvia() {
@@ -84,6 +102,7 @@ Readda.Notifiche = (function () {
   return {
     supportate: supportate, permesso: permesso, chiedi: chiedi,
     dovute: dovute, avvia: avvia, ferma: ferma,
-    aggiornaPallino: aggiornaPallino, invia: invia
+    aggiornaPallino: aggiornaPallino, invia: invia,
+    messaggio: messaggio, nellaFinestra: nellaFinestra, controlla: controlla
   };
 })();

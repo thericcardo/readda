@@ -314,6 +314,11 @@ Readda.Store = (function () {
     return n;
   }
 
+  /* Un promemoria al giorno, all'ora scelta: serve a notify.js per non
+     ripetersi ogni cinque minuti finche' la scheda resta in secondo piano. */
+  function avvisatoOggi() { return stato.stats.ultimoAvviso === oggiISO(); }
+  function segnaAvviso() { stato.stats.ultimoAvviso = oggiISO(); salva(); }
+
   /* ---------- impostazioni ---------- */
   // i campi mancanti li riempie normalizzaStato() al caricamento dell'account
   function impostazioni() { return stato.impostazioni; }
@@ -367,6 +372,7 @@ Readda.Store = (function () {
     tutteLeParole: function () { return stato.parole; },
     strisciaViva: strisciaViva, fatteOggi: fatteOggi, nuoveOggi: nuoveOggi,
     oggiISO: oggiISO, ieriISO: ieriISO,
+    avvisatoOggi: avvisatoOggi, segnaAvviso: segnaAvviso,
     impostazioni: impostazioni, imposta: imposta,
     esporta: esporta, importa: importa, cancellaAccount: cancellaAccount,
     salva: salva,

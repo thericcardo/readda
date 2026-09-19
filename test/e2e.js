@@ -349,6 +349,13 @@ function gruppo(n) { console.log('\n' + n); }
       return 'ok';
     } catch (e) { return e.message; }
   });
+  await page.click('[data-ora="9"]');
+  await page.waitForTimeout(250);
+  ok('l\'ora del promemoria si sceglie e resta',
+     await page.getAttribute('.filtro[data-ora="9"]', 'aria-pressed') === 'true');
+  ok('l\'ora del promemoria e\' salvata nello stato',
+     await page.evaluate(() => Readda.Store.impostazioni().oraPromemoria) === 9);
+
   ok('avvia e ferma i promemoria senza errori', spegnimento === 'ok', spegnimento);
 
   await page.click('#esporta');

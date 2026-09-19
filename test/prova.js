@@ -9,6 +9,8 @@ function gruppo(n) { console.log('\n' + n); }
 
 carica('js/srs.js');
 carica('js/store.js');
+carica('js/ui.js');
+carica('js/notify.js');
 const C = caricaCorpus(8);
 const S = ctx.Readda.Store, R = ctx.Readda.Srs;
 const L = C.disponibili();
@@ -477,12 +479,68 @@ gruppo('Verbi irregolari nel controllo delle frasi');
      L.slice(0, 500).every(x => { const r = R.radici(x.id); return new Set(r).size === r.length; }));
 }
 
+gruppo('La pagina dell\'artefatto resta allineata a index.html');
+{
+  const fsm = require('fs'), pth = require('path');
+  const radiceProg = pth.join(__dirname, '..');
+  const indice = fsm.readFileSync(pth.join(radiceProg, 'index.html'), 'utf8');
+  const arte = fsm.readFileSync(pth.join(radiceProg, 'artefatto', 'readda.html'), 'utf8');
+
+  /* La pagina dell'artefatto e' generata da index.html: se si aggiunge uno
+     script e non si rigenera, l'artefatto resta indietro in silenzio. */
+  const scripts = t => (t.match(/<script src="([^"]+)"><\/script>/g) || [])
+    .map(m => m.replace(/.*src="/, '').replace(/".*/, ''));
+  const mancanti = scripts(indice).filter(f => scripts(arte).indexOf(f) < 0);
+  ok('l\'artefatto carica gli stessi script di index.html', mancanti.length === 0,
+     { mancanti: mancanti, suggerimento: 'python3 strumenti/artefatto.py' });
+
+  /* Dentro l'artefatto la pagina non sta alla radice di un dominio suo e
+     sw.js non e' fra i file pubblicati: registrarlo fallisce a ogni
+     apertura. La riga che doveva impedirlo sostituiva una stringa con se
+     stessa, quindi non impediva niente. */
+  ok('l\'artefatto spegne il service worker', /READDA_SENZA_SW\s*=\s*true/.test(arte));
+  ok('e non rimanda a sw.js', arte.indexOf('sw.js') < 0);
+
+  const app = fsm.readFileSync(pth.join(radiceProg, 'js/app.js'), 'utf8');
+  ok('l\'avvio controlla quella variabile prima di registrare',
+     /READDA_SENZA_SW/.test(app) &&
+     app.indexOf('READDA_SENZA_SW') < app.indexOf("register('sw.js')"));
+}
+
 gruppo('Accenti e maiuscole nel riconoscimento');
 ok('ignora le maiuscole', R.contiene('BLANDIRE la folla', 'blandire'));
 ok('ignora gli accenti nel testo', R.contiene('La perifrasi \u00e8 gi\u00e0 una perifrasi', 'perifrasi'));
 ok('trova un lemma accentato scritto senza accento', R.contiene('una societa perduta', 'societ\u00e0'));
 ok('la punteggiatura attaccata non disturba', R.contiene('Che coacervo!', 'coacervo'));
 ok('non confonde una parola che la contiene a meta\u0027', !R.contiene('il tedesco parla', 'tedio'));
+
+gruppo('Promemoria all\'ora scelta');
+{
+  /* `oraPromemoria` era salvata e non la leggeva nessuno: con la scheda in
+     secondo piano il controllo partiva ogni cinque minuti dalla mattina
+     alla notte. Un'impostazione che non fa niente e' peggio di una che non
+     c'e'. */
+  const N = ctx.Readda.Notifiche;
+  ok('la finestra copre l\'ora scelta', N.nellaFinestra(20, 20));
+  ok('e l\'ora successiva', N.nellaFinestra(20, 21));
+  ok('ma non due ore dopo', !N.nellaFinestra(20, 22));
+  ok('ne\' prima dell\'ora scelta', !N.nellaFinestra(20, 19));
+  ok('e scavalca la mezzanotte per un orario serale', N.nellaFinestra(23, 0));
+  ok('senza scavalcare di piu\' del dovuto', !N.nellaFinestra(23, 1) && !N.nellaFinestra(23, 22));
+
+  S.entra('Riccardo');
+  ok('un promemoria si segna una volta sola al giorno',
+     (S.segnaAvviso(), S.avvisatoOggi() === true));
+  S.entra('Ospite');
+  ok('il conto dei promemoria e\' per account', S.avvisatoOggi() === false);
+  S.entra('Riccardo');
+
+  /* messaggio() ricalcolava le scadenze invece di usare quelle gia' in mano:
+     bastava che nel frattempo cambiassero per leggere `undefined.id`. */
+  const m = N.messaggio({ totale: 3, produzione: 2, riconoscimento: 1, elenco: [] });
+  ok('un elenco vuoto non fa saltare il messaggio',
+     typeof m.titolo === 'string' && m.titolo.length > 0, m);
+}
 
 gruppo('Impostazioni');
 S.entra('Riccardo');
