@@ -559,6 +559,18 @@ gruppo('La pagina dell\'artefatto resta allineata a index.html');
   ok('l\'avvio controlla quella variabile prima di registrare',
      /READDA_SENZA_SW/.test(app) &&
      app.indexOf('READDA_SENZA_SW') < app.indexOf("register('sw.js')"));
+
+  /* Il guscio offline elenca a mano i file da mettere in cache
+     all'installazione. Aggiungere una vista e dimenticarsi di questa lista
+     non rompe niente finche' c'e' rete: si scopre in aereo. */
+  const sw = fsm.readFileSync(pth.join(radiceProg, 'sw.js'), 'utf8');
+  const inGuscio = (sw.slice(sw.indexOf('var GUSCIO'), sw.indexOf('];', sw.indexOf('var GUSCIO')))
+    .match(/'\.\/([^']*)'/g) || []).map(x => x.slice(3, -1));
+  const fuoriGuscio = scripts(indice).filter(f => inGuscio.indexOf(f) < 0);
+  ok('il guscio offline contiene tutti gli script di index.html',
+     fuoriGuscio.length === 0, fuoriGuscio);
+  const inesistenti = inGuscio.filter(f => f && !fsm.existsSync(pth.join(radiceProg, f)));
+  ok('e nessun file che non esiste', inesistenti.length === 0, inesistenti);
 }
 
 gruppo('Accenti e maiuscole nel riconoscimento');
