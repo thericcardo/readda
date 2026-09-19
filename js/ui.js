@@ -47,18 +47,76 @@ Readda.Ui = (function () {
     timerBrindisi = setTimeout(function () { brindisiEl.classList.remove('su'); }, ms || 2600);
   }
 
-  /* Foglio modale che sale dal basso. onChiudi riceve il nodo. */
+  /* Foglio modale che sale dal basso. onAperto riceve il nodo e la chiusura.
+   *
+   * Si chiude toccando fuori, e anche con Esc: toccare fuori e' un gesto che
+   * esiste solo col dito o col puntatore, e senza Esc chi naviga da tastiera
+   * restava dentro il foglio senza via d'uscita. Il fuoco entra nel foglio
+   * all'apertura e torna dov'era alla chiusura, altrimenti un lettore di
+   * schermo continua a leggere la pagina sotto. */
   function foglio(contenuto, onAperto) {
+    var prima = document.activeElement;
     var velo = document.createElement('div');
     velo.className = 'velo';
-    velo.innerHTML = '<div class="foglio"><div class="maniglia"></div>' + contenuto + '</div>';
+    velo.innerHTML = '<div class="foglio" role="dialog" aria-modal="true" tabindex="-1">' +
+                     '<div class="maniglia" aria-hidden="true"></div>' + contenuto + '</div>';
     document.body.appendChild(velo);
-    function chiudi() {
-      velo.style.animation = 'sfuma .22s reverse both';
-      setTimeout(function () { velo.remove(); }, 200);
+
+    var FUOCABILI = 'button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])';
+
+    /* `aria-modal="true"` dice alle tecnologie assistive che il resto della
+     * pagina non esiste. Se poi il tab ci esce davvero, chi naviga da
+     * tastiera finisce a pilotare comandi sotto il velo, invisibili e
+     * dichiarati inerti. Dichiararlo senza chiudere il giro e' peggio che
+     * non dichiararlo. */
+    function trattieni(e) {
+      var dentro = velo.querySelector('.foglio');
+      var nodi = [].slice.call(dentro.querySelectorAll(FUOCABILI))
+        .filter(function (n) { return !n.disabled && n.offsetParent !== null; });
+      if (!nodi.length) { e.preventDefault(); dentro.focus(); return; }
+      var primo = nodi[0], ultimo = nodi[nodi.length - 1];
+      if (e.shiftKey && (document.activeElement === primo || document.activeElement === dentro)) {
+        e.preventDefault(); ultimo.focus();
+      } else if (!e.shiftKey && document.activeElement === ultimo) {
+        e.preventDefault(); primo.focus();
+      }
     }
+
+    function onTasto(e) {
+      if (e.key === 'Escape') { e.preventDefault(); chiudi(); }
+      else if (e.key === 'Tab') trattieni(e);
+    }
+
+    var chiuso = false;
+    function chiudi() {
+      if (chiuso) return;
+      chiuso = true;
+      document.removeEventListener('keydown', onTasto);
+      velo.style.animation = 'sfuma .22s reverse both';
+      setTimeout(function () {
+        velo.remove();
+        /* Il fuoco torna dopo che il velo se n'e' andato: prima, per due
+         * decimi di secondo, sarebbe stato su un comando ancora coperto, e
+         * un Invio l'avrebbe azionato senza che si vedesse. E solo se quel
+         * nodo esiste ancora - chi chiude il foglio spesso ridisegna la
+         * schermata subito dopo, e a quel punto non c'e' piu' niente su cui
+         * tornare. */
+        if (prima && prima.focus && document.contains(prima)) prima.focus();
+      }, 200);
+    }
+
     velo.addEventListener('click', function (e) { if (e.target === velo) chiudi(); });
-    if (onAperto) onAperto(velo.querySelector('.foglio'), chiudi);
+    document.addEventListener('keydown', onTasto);
+
+    /* Il fuoco va sul primo campo da riempire, se c'e', altrimenti sul
+     * foglio stesso. Non sul primo bottone: il foglio che chiede «Cancellare
+     * tutto?» comincia con «Si', cancella», e metterci sopra il fuoco vuol
+     * dire che un Invio distratto cancella l'account. */
+    var dentro = velo.querySelector('.foglio');
+    var primoCampo = dentro.querySelector('input:not([readonly]), textarea:not([readonly])');
+    (primoCampo || dentro).focus();
+
+    if (onAperto) onAperto(dentro, chiudi);
     return chiudi;
   }
 
@@ -81,9 +139,21 @@ Readda.Ui = (function () {
     lavoro: 'Lavoro', diritto: 'Diritto', politica: 'Società', pensiero: 'Ragionamento',
     scuola: 'Scuola', scienza: 'Scienza', lingua: 'Lingua', tecnologia: 'Tecnologia',
     emozioni: 'Emozioni', tempo: 'Tempo', storia: 'Storia', natura: 'Natura',
-    medicina: 'Salute', cucina: 'Cucina', arte: 'Arte', generale: 'Generale'
+    medicina: 'Salute', cucina: 'Cucina', arte: 'Arte', generale: 'Generale',
+    // "altro" non e' un dominio del corpus: e' la risposta "nessuna di
+    // queste" alla prima domanda, e nella testata di Io compariva minuscola
+    altro: 'Altro'
   };
-  function nomeDominio(d) { return NOMI_DOMINIO[d] || d; }
+  /* `NOMI_DOMINIO[d]` da solo raggiunge anche il prototipo: nomeDominio
+   * ('constructor') restituiva il sorgente di Object dentro un'etichetta.
+   * E `d` puo' non essere una stringa, se arriva da un backup scritto a
+   * mano: `d.charAt` lanciava e la schermata Io restava bianca. */
+  function nomeDominio(d) {
+    if (!d) return 'Generale';
+    d = String(d);
+    if (Object.prototype.hasOwnProperty.call(NOMI_DOMINIO, d)) return NOMI_DOMINIO[d];
+    return d.charAt(0).toUpperCase() + d.slice(1);
+  }
 
   function quando(ms) {
     var d = ms - Date.now();

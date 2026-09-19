@@ -13,9 +13,20 @@ function ok(nome, cond, extra) {
 }
 function gruppo(n) { console.log('\n' + n); }
 
+/* Dove sta Chromium dipende da chi esegue la prova. Su questa macchina di
+ * sviluppo e' gia' scaricato in /opt; su un esecutore di integrazione se lo
+ * scarica Playwright e sa da se' dove l'ha messo. Il percorso era scritto a
+ * mano e valeva solo qui: altrove la prova non partiva nemmeno. */
+function doveSta() {
+  if (process.env.CHROME) return { executablePath: process.env.CHROME };
+  const proprio = '/opt/pw-browsers/chromium-1194/chrome-linux/chrome';
+  if (fs.existsSync(proprio)) return { executablePath: proprio };
+  return {};   // se lo trova Playwright
+}
+
 (async () => {
   fs.mkdirSync(SCATTI, { recursive: true });
-  const browser = await chromium.launch({ executablePath: process.env.CHROME || '/opt/pw-browsers/chromium-1194/chrome-linux/chrome' });
+  const browser = await chromium.launch(doveSta());
   const ctx = await browser.newContext({ viewport: { width: 390, height: 844 }, deviceScaleFactor: 2, locale: 'it-IT' });
   const page = await ctx.newPage();
 
@@ -160,10 +171,20 @@ function gruppo(n) { console.log('\n' + n); }
   await page.click('.voce');
   await page.waitForSelector('.foglio');
   ok('il dettaglio si apre in un foglio', await page.isVisible('.foglio .lemma'));
+  // il foglio sale in tre decimi di secondo: senza l'attesa la schermata
+  // fotografava un pannello a meta' strada, quasi invisibile
+  await page.waitForTimeout(420);
   await page.screenshot({ path: path.join(SCATTI, '6-dettaglio.png') });
-  await page.keyboard.press('Escape');
+
+  // le due vie d'uscita, una alla volta: prima il tocco fuori
   await page.click('.velo', { position: { x: 10, y: 10 } });
   await page.waitForTimeout(300);
+  ok('toccare fuori chiude il foglio', await page.locator('.foglio').count() === 0);
+  await page.click('.voce');
+  await page.waitForSelector('.foglio');
+  await page.keyboard.press('Escape');
+  await page.waitForTimeout(300);
+  ok('e anche Esc', await page.locator('.foglio').count() === 0);
 
   gruppo('Ripasso a produzione');
   // porto a scadenza tutte le parole passive
@@ -227,6 +248,185 @@ function gruppo(n) { console.log('\n' + n); }
   await page.waitForSelector('#dose-txt');
   ok('il flusso usa la nuova dose', (await page.textContent('#dose-txt')).endsWith('/ 25'),
      await page.textContent('#dose-txt'));
+  gruppo('Tastiera e lettori di schermo');
+  {
+    /* L'app si guida da tastiera (1, 2, 3 nel flusso) ma l'unico stile di
+       fuoco stava sul campo di testo: chi non usa il puntatore non vedeva
+       mai dove si trovava. */
+    await page.click('.tab[data-rotta="#/feed"]');
+    await page.waitForSelector('#carta-viva');
+    const conFuoco = await page.evaluate(() => {
+      const b = document.querySelector('[data-giudizio="attiva"]');
+      b.focus();
+      // :focus-visible non si attiva con .focus() da script in tutti i casi,
+      // quindi si controlla che la regola esista e si applichi al selettore
+      return [...document.styleSheets]
+        .flatMap(f => { try { return [...f.cssRules]; } catch (e) { return []; } })
+        .filter(r => r.selectorText && r.selectorText.indexOf(':focus-visible') >= 0)
+        .map(r => r.selectorText);
+    });
+    ok('esistono regole di fuoco da tastiera', conFuoco.length >= 3, conFuoco.length);
+    ok('coprono i bottoni principali',
+       conFuoco.join(' ').indexOf('.azione:focus-visible') >= 0 &&
+       conFuoco.join(' ').indexOf('.opz:focus-visible') >= 0, conFuoco);
+
+    /* La pila si riscrive a ogni giudizio: senza regione viva il contenuto
+       cambia in silenzio. E la carta dietro e' decorazione: letta ad alta
+       voce annuncerebbe due parole quando ne e' arrivata una. */
+    ok('la pila e\' una regione viva',
+       await page.getAttribute('#pila', 'aria-live') === 'polite');
+    ok('la carta dietro non viene annunciata',
+       await page.evaluate(() => {
+         const d = document.querySelector('.carta.dietro');
+         return !d || d.getAttribute('aria-hidden') === 'true';
+       }));
+    ok('i timbri del trascinamento non vengono annunciati',
+       await page.evaluate(() => [...document.querySelectorAll('.timbro')]
+         .every(t => t.getAttribute('aria-hidden') === 'true')));
+    ok('la sillabazione non viene letta lettera per lettera',
+       await page.getAttribute('#carta-viva .sillabe', 'aria-hidden') === 'true');
+    ok('la rarita\' ha un\'etichetta a parole',
+       /rarit./.test(await page.getAttribute('#carta-viva .livello', 'aria-label') || ''),
+       await page.getAttribute('#carta-viva .livello', 'aria-label'));
+    ok('nessuna carta mostra un esempio vuoto',
+       await page.evaluate(() => [...document.querySelectorAll('.carta .esempio')]
+         .every(p => p.textContent.trim().length > 0)));
+  }
+
+  gruppo('Il foglio modale si chiude anche senza dito');
+  {
+    await page.click('.tab[data-rotta="#/collezione"]');
+    await page.waitForSelector('.filtri');
+    const voci = await page.locator('.voce').count();
+    if (voci > 0) {
+      // si apre con la tastiera, cosi' il fuoco di partenza e' la voce stessa
+      await page.focus('.voce');
+      const partenza = await page.evaluate(() =>
+        document.activeElement.getAttribute('data-id'));
+      await page.keyboard.press('Enter');
+      await page.waitForSelector('.foglio');
+      ok('il foglio si dichiara modale',
+         await page.getAttribute('.foglio', 'aria-modal') === 'true');
+      ok('il fuoco entra nel foglio',
+         await page.evaluate(() => !!document.activeElement.closest('.foglio')));
+      // il foglio della raccolta non ha campi: il fuoco sta sul contenitore,
+      // non sul bottone «Toglila dalla raccolta»
+      ok('il fuoco non finisce su un bottone che fa qualcosa',
+         await page.evaluate(() => document.activeElement.tagName !== 'BUTTON'),
+         await page.evaluate(() => document.activeElement.tagName));
+
+      /* Il foglio si dichiara modale: se poi il tab ci esce davvero, chi
+         naviga da tastiera finisce a pilotare comandi sotto il velo. */
+      for (let t = 0; t < 8; t++) await page.keyboard.press('Tab');
+      ok('otto tab non portano fuori dal foglio',
+         await page.evaluate(() => !!document.activeElement.closest('.foglio')),
+         await page.evaluate(() => document.activeElement.className ||
+                                   document.activeElement.tagName));
+      for (let t = 0; t < 4; t++) await page.keyboard.press('Shift+Tab');
+      ok('e nemmeno quattro all\'indietro',
+         await page.evaluate(() => !!document.activeElement.closest('.foglio')));
+      await page.keyboard.press('Escape');
+      await page.waitForTimeout(320);
+      ok('Esc lo chiude', await page.locator('.foglio').count() === 0);
+      // il fuoco torna dopo la sparizione del velo, non prima
+      ok('il velo se n\'e\' andato prima che il fuoco torni',
+         await page.locator('.velo').count() === 0);
+      const ritorno = await page.evaluate(() =>
+        document.activeElement && document.activeElement.getAttribute
+          ? document.activeElement.getAttribute('data-id') : null);
+      ok('il fuoco torna esattamente sulla voce da cui era partito',
+         ritorno !== null && ritorno === partenza, { partenza: partenza, ritorno: ritorno });
+    } else {
+      ok('nessuna voce in raccolta: foglio non verificabile', true, 'saltato');
+    }
+  }
+
+  {
+    /* Il foglio che chiede «Cancellare tutto?» comincia con «Si', cancella»:
+       se il fuoco ci finisse sopra, un Invio distratto cancellerebbe
+       l'account. */
+    await page.click('.tab[data-rotta="#/io"]');
+    await page.waitForSelector('#cancella');
+    await page.click('#cancella');
+    await page.waitForSelector('#si');
+    ok('nel foglio di cancellazione il fuoco non sta sul bottone distruttivo',
+       await page.evaluate(() => document.activeElement.id !== 'si'),
+       await page.evaluate(() => document.activeElement.id || document.activeElement.className));
+    await page.keyboard.press('Escape');
+    await page.waitForTimeout(320);
+    ok('e l\'account esiste ancora',
+       await page.evaluate(() => Readda.Store.caricato()) === true);
+  }
+
+  gruppo('La dose ferma il flusso, e lascia una porta');
+  {
+    /* La dose era un ornamento: la barra arrivava al 100% e il flusso
+       continuava. Adesso si ferma. Ma un muro che manda via chi ha dieci
+       minuti liberi sarebbe punitivo, quindi c'e' un'uscita esplicita. */
+    await page.click('.tab[data-rotta="#/io"]');
+    await page.waitForSelector('[data-dose]');
+    await page.click('[data-dose="10"]');
+    await page.waitForTimeout(250);
+    await page.click('.tab[data-rotta="#/feed"]');
+    await page.waitForSelector('#dose-txt');
+
+    // si porta il conto delle parole nuove di oggi a ridosso della dose
+    const nuovePrima = await page.evaluate(() => Readda.Store.nuoveOggi());
+    ok('la dose conta le parole nuove, non i ripassi',
+       (await page.textContent('#dose-txt')) === nuovePrima + ' / 10',
+       { barra: await page.textContent('#dose-txt'), nuove: nuovePrima });
+
+    let giri = 0;
+    while (await page.locator('#carta-viva').count() && giri < 30) {
+      await page.click('[data-giudizio="attiva"]');
+      await page.waitForTimeout(340);
+      giri++;
+    }
+    ok('il flusso si ferma alla dose', await page.locator('#oltre').count() === 1);
+
+    /* I tasti restavano attivi sulla schermata di pausa: uno spazio
+       giudicava una parola mai vista e, siccome preventDefault() partiva
+       comunque, non azionava nemmeno il bottone su cui stava il fuoco. */
+    const primaDeiTasti = await page.evaluate(() => Readda.Store.nuoveOggi());
+    await page.keyboard.press('Space');
+    await page.keyboard.press('1');
+    await page.keyboard.press('2');
+    await page.waitForTimeout(400);
+    ok('i tasti non giudicano parole mentre il flusso e\' fermo',
+       await page.evaluate(() => Readda.Store.nuoveOggi()) === primaDeiTasti,
+       { prima: primaDeiTasti, dopo: await page.evaluate(() => Readda.Store.nuoveOggi()) });
+    ok('e la pausa e\' ancora li\'', await page.locator('#oltre').count() === 1);
+
+    // lo spazio deve poter azionare il bottone, che e' il punto
+    await page.focus('#oltre');
+    await page.keyboard.press('Space');
+    await page.waitForSelector('#carta-viva');
+    ok('lo spazio sul bottone «Continua lo stesso» funziona',
+       await page.locator('#carta-viva').count() === 1);
+    ok('e i tre bottoni del flusso tornano visibili',
+       await page.locator('[data-giudizio]').first().isVisible());
+    // si rimette la pausa per le prove che seguono
+    await page.click('.tab[data-rotta="#/collezione"]');
+    await page.waitForSelector('.filtri');
+    await page.click('.tab[data-rotta="#/feed"]');
+    await page.waitForSelector('#carta-viva');
+    ok('la barra non supera la dose', (await page.textContent('#dose-txt')) === '10 / 10',
+       await page.textContent('#dose-txt'));
+
+    ok('la scelta di continuare vale per tutta la giornata',
+       await page.locator('#carta-viva').count() === 1);
+    await page.click('[data-giudizio="attiva"]');
+    await page.waitForTimeout(340);
+    ok('e non si rimette in mezzo a ogni carta',
+       await page.locator('#carta-viva').count() === 1);
+
+    // si rimette la dose alta, cosi' le prove successive trovano il flusso aperto
+    await page.click('.tab[data-rotta="#/io"]');
+    await page.waitForSelector('[data-dose]');
+    await page.click('[data-dose="40"]');
+    await page.waitForTimeout(250);
+  }
+
   await page.click('.tab[data-rotta="#/io"]');
   await page.waitForSelector('.numeri');
 
@@ -251,6 +451,13 @@ function gruppo(n) { console.log('\n' + n); }
       return 'ok';
     } catch (e) { return e.message; }
   });
+  await page.click('[data-ora="9"]');
+  await page.waitForTimeout(250);
+  ok('l\'ora del promemoria si sceglie e resta',
+     await page.getAttribute('.filtro[data-ora="9"]', 'aria-pressed') === 'true');
+  ok('l\'ora del promemoria e\' salvata nello stato',
+     await page.evaluate(() => Readda.Store.impostazioni().oraPromemoria) === 9);
+
   ok('avvia e ferma i promemoria senza errori', spegnimento === 'ok', spegnimento);
 
   await page.click('#esporta');

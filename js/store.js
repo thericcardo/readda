@@ -32,15 +32,95 @@ Readda.Store = (function () {
     };
   }
 
-  /* ---------- codice di ripristino ---------- */
-  var SILLABE = ['bra','cor','del','fio','gua','lan','mer','nis','ora','pel','rin','sal','tor','vel','zaf','cam','dun','fal'];
-  function generaCodice() {
-    var p = [];
-    for (var i = 0; i < 4; i++) {
-      var s = SILLABE[Math.floor(Math.random() * SILLABE.length)] +
-              SILLABE[Math.floor(Math.random() * SILLABE.length)];
-      p.push(s);
+  /* ---------- forma dei dati ----------
+   * Un account puo' arrivare da una versione precedente dell'app o da un
+   * backup scritto a mano, e in quel caso gli manca qualcosa. Finora ogni
+   * vista se la cavava per conto suo: la raccolta metteva le sue difese
+   * (`p.usi = p.usi || []`), il ripasso e la schermata Io no, e leggevano
+   * `p.usi.length` su un campo che poteva non esserci. Tre difese diverse
+   * per lo stesso problema vuol dire due punti scoperti.
+   *
+   * Qui c'e' un posto solo: si passa di qui una volta, quando l'account si
+   * carica, e da li' in poi la forma e' garantita. */
+  function normalizzaParola(p) {
+    if (!p || typeof p !== 'object') return null;
+    if (!Array.isArray(p.usi)) p.usi = [];
+    if (typeof p.box !== 'number') p.box = 0;
+    if (typeof p.prox !== 'number') p.prox = 0;
+    if (typeof p.visto !== 'number') p.visto = 0;
+    if (typeof p.ok !== 'number') p.ok = 0;
+    if (typeof p.ko !== 'number') p.ko = 0;
+    if (typeof p.dal !== 'number') p.dal = 0;
+    if (typeof p.ultimo !== 'number') p.ultimo = p.dal;
+    p.bluff = !!p.bluff;
+    return p;
+  }
+
+  /* Uno stato che non conosciamo non e' per forza spazzatura: puo' venire da
+   * una versione piu' recente dell'app, o da una che verra'. Il record resta
+   * dov'e' - cancellare dati altrui per non saperli leggere e' la scelta
+   * peggiore possibile - e semplicemente non compare in nessun elenco: il
+   * ripasso lo salta, la raccolta filtra per stato, e il conteggio delle
+   * parole incontrate non lo somma. */
+  var STATI = ['ignota', 'passiva', 'attiva'];
+  function statoValido(p) { return !!p && STATI.indexOf(p.stato) >= 0; }
+
+  function normalizzaStato(s) {
+    if (!s || typeof s !== 'object' || !s.profilo || typeof s.profilo.nick !== 'string') return null;
+    // generaCodice() solo se serve: valutarlo sempre vorrebbe dire sorteggiare
+    // e buttare via un codice a ogni caricamento di account
+    var base = vuoto(s.profilo.nick, s.profilo.codice ? s.profilo.codice : generaCodice());
+    var k;
+    for (k in base.profilo) {
+      if (base.profilo.hasOwnProperty(k) && s.profilo[k] === undefined) s.profilo[k] = base.profilo[k];
     }
+    if (!Array.isArray(s.profilo.interessi)) s.profilo.interessi = [];
+
+    if (!s.parole || typeof s.parole !== 'object') s.parole = {};
+    for (var id in s.parole) {
+      if (!s.parole.hasOwnProperty(id)) continue;
+      // solo i valori che non sono nemmeno oggetti se ne vanno
+      if (!normalizzaParola(s.parole[id])) delete s.parole[id];
+    }
+
+    if (!s.stats || typeof s.stats !== 'object') s.stats = base.stats;
+    if (!Array.isArray(s.stats.giorni)) s.stats.giorni = [];
+    if (typeof s.stats.striscia !== 'number') s.stats.striscia = 0;
+
+    if (!s.impostazioni || typeof s.impostazioni !== 'object') s.impostazioni = base.impostazioni;
+    for (k in base.impostazioni) {
+      if (base.impostazioni.hasOwnProperty(k) && s.impostazioni[k] === undefined) {
+        s.impostazioni[k] = base.impostazioni[k];
+      }
+    }
+    return s;
+  }
+
+  /* ---------- codice di ripristino ----------
+   * Quattro gruppi di due sillabe su diciotto: circa undici miliardi di
+   * combinazioni. Il numero va bene, la sorgente no: Math.random() non e'
+   * pensato per generare segreti, e questo codice l'app lo presenta come
+   * "l'unico modo per riprenderti i tuoi dati". Costa una riga prenderlo
+   * da crypto, con Math.random() di riserva dove crypto non c'e'. */
+  var SILLABE = ['bra','cor','del','fio','gua','lan','mer','nis','ora','pel','rin','sal','tor','vel','zaf','cam','dun','fal'];
+
+  function sorteggia(quanti, massimo) {
+    var fuori = [], i;
+    try {
+      if (typeof crypto !== 'undefined' && crypto.getRandomValues) {
+        var grezzi = new Uint32Array(quanti);
+        crypto.getRandomValues(grezzi);
+        for (i = 0; i < quanti; i++) fuori.push(grezzi[i] % massimo);
+        return fuori;
+      }
+    } catch (e) { /* finestre e contesti dove crypto non e' esposto */ }
+    for (i = 0; i < quanti; i++) fuori.push(Math.floor(Math.random() * massimo));
+    return fuori;
+  }
+
+  function generaCodice() {
+    var n = sorteggia(8, SILLABE.length), p = [];
+    for (var i = 0; i < 8; i += 2) p.push(SILLABE[n[i]] + SILLABE[n[i + 1]]);
     return p.join('-');
   }
 
@@ -70,7 +150,9 @@ Readda.Store = (function () {
     var tutti = leggiTutti();
     var chiave = n.toLowerCase();
     if (!tutti[chiave]) return { ok: false, err: 'Nickname non trovato su questo dispositivo.' };
-    stato = tutti[chiave];
+    var s = normalizzaStato(tutti[chiave]);
+    if (!s) return { ok: false, err: 'I dati di questo account sono illeggibili.' };
+    stato = s;
     nick = chiave;
     ricorda(chiave);
     return { ok: true };
@@ -81,7 +163,9 @@ Readda.Store = (function () {
     if (!chiave) return false;
     var tutti = leggiTutti();
     if (!tutti[chiave]) return false;
-    stato = tutti[chiave]; nick = chiave;
+    var s = normalizzaStato(tutti[chiave]);
+    if (!s) return false;
+    stato = s; nick = chiave;
     return true;
   }
 
@@ -92,7 +176,10 @@ Readda.Store = (function () {
 
   function elencoNick() {
     var t = leggiTutti(), out = [];
-    for (var k in t) if (t.hasOwnProperty(k)) out.push(t[k].profilo.nick);
+    for (var k in t) {
+      // un account rotto non deve impedire l'elenco degli altri
+      if (t.hasOwnProperty(k) && t[k] && t[k].profilo && t[k].profilo.nick) out.push(t[k].profilo.nick);
+    }
     return out;
   }
 
@@ -188,18 +275,42 @@ Readda.Store = (function () {
     return out;
   }
 
-  function contaVisti() { return Object.keys(stato.parole).length; }
+  function contaVisti() {
+    var n = 0;
+    for (var id in stato.parole) {
+      if (stato.parole.hasOwnProperty(id) && statoValido(stato.parole[id])) n++;
+    }
+    return n;
+  }
 
-  /* ---------- striscia di giorni ---------- */
-  function oggiISO() { var d = new Date(); return d.getFullYear() + '-' + (d.getMonth() + 1) + '-' + d.getDate(); }
+  /* ---------- striscia di giorni ----------
+   *
+   * "Ieri" non si calcola togliendo ventiquattro ore all'istante di adesso.
+   * Il giorno del passaggio all'ora legale ne dura ventitre', quindi il
+   * lunedi' successivo alle 00:30 quel conto torna indietro di due giorni:
+   *   31 marzo 2025, 00:30  meno 864e5 ms  =  29 marzo, 23:30
+   * La striscia non riconosceva il giorno prima e ripartiva da uno. Due
+   * volte l'anno, a chi apre l'app dopo mezzanotte - e la striscia e' uno
+   * dei tre numeri della schermata Io.
+   *
+   * Si passa quindi per il calendario: si prende la data di oggi e le si
+   * toglie un giorno, che e' un'operazione definita qualunque cosa faccia
+   * l'orologio. */
+  function giornoDi(d) { return d.getFullYear() + '-' + (d.getMonth() + 1) + '-' + d.getDate(); }
+  function oggiISO() { return giornoDi(new Date()); }
+
+  function ieriISO() {
+    var d = new Date();
+    d.setHours(12, 0, 0, 0);   // mezzogiorno: nessun cambio d'ora lo sposta di giorno
+    d.setDate(d.getDate() - 1);
+    return giornoDi(d);
+  }
 
   function registraGiorno() {
     var g = oggiISO();
     var s = stato.stats;
     if (s.ultimoGiorno === g) return;
-    var ieri = new Date(Date.now() - 864e5);
-    var ieriISO = ieri.getFullYear() + '-' + (ieri.getMonth() + 1) + '-' + ieri.getDate();
-    s.striscia = (s.ultimoGiorno === ieriISO) ? s.striscia + 1 : 1;
+    s.striscia = (s.ultimoGiorno === ieriISO()) ? s.striscia + 1 : 1;
     s.ultimoGiorno = g;
     s.giorni.push(g);
     if (s.giorni.length > 400) s.giorni = s.giorni.slice(-400);
@@ -208,26 +319,41 @@ Readda.Store = (function () {
   function strisciaViva() {
     var s = stato.stats;
     if (!s.ultimoGiorno) return 0;
-    var g = oggiISO();
-    var ieri = new Date(Date.now() - 864e5);
-    var ieriISO = ieri.getFullYear() + '-' + (ieri.getMonth() + 1) + '-' + ieri.getDate();
-    return (s.ultimoGiorno === g || s.ultimoGiorno === ieriISO) ? s.striscia : 0;
+    return (s.ultimoGiorno === oggiISO() || s.ultimoGiorno === ieriISO()) ? s.striscia : 0;
   }
 
+  function mezzanotte() { var d = new Date(); d.setHours(0, 0, 0, 0); return d.getTime(); }
+
+  /* Tutto cio' che e' stato toccato oggi: nuove carte del flusso e ripassi
+     insieme. Serve a dire "oggi hai lavorato", non a contare la dose. */
   function fatteOggi() {
-    var g = oggiISO(), n = 0, inizio = new Date(); inizio.setHours(0, 0, 0, 0);
+    var n = 0, da = mezzanotte();
     for (var id in stato.parole) {
-      if (stato.parole.hasOwnProperty(id) && stato.parole[id].ultimo >= inizio.getTime()) n++;
+      if (stato.parole.hasOwnProperty(id) && stato.parole[id].ultimo >= da) n++;
     }
     return n;
   }
 
-  /* ---------- impostazioni ---------- */
-  function impostazioni() {
-    // gli account creati prima che l'impostazione esistesse non ce l'hanno
-    if (stato.impostazioni.esplicito === undefined) stato.impostazioni.esplicito = false;
-    return stato.impostazioni;
+  /* Solo le parole incontrate oggi per la prima volta. E' quello che la
+     dose promette di limitare: "quante parole nuove al giorno". Un ripasso
+     non e' una parola nuova, e contarlo faceva salire la barra senza che
+     il flusso avesse consegnato niente. */
+  function nuoveOggi() {
+    var n = 0, da = mezzanotte();
+    for (var id in stato.parole) {
+      if (stato.parole.hasOwnProperty(id) && stato.parole[id].dal >= da) n++;
+    }
+    return n;
   }
+
+  /* Un promemoria al giorno, all'ora scelta: serve a notify.js per non
+     ripetersi ogni cinque minuti finche' la scheda resta in secondo piano. */
+  function avvisatoOggi() { return stato.stats.ultimoAvviso === oggiISO(); }
+  function segnaAvviso() { stato.stats.ultimoAvviso = oggiISO(); salva(); }
+
+  /* ---------- impostazioni ---------- */
+  // i campi mancanti li riempie normalizzaStato() al caricamento dell'account
+  function impostazioni() { return stato.impostazioni; }
   function imposta(k, v) { stato.impostazioni[k] = v; salva(); }
 
   /* ---------- esportazione / importazione ---------- */
@@ -236,18 +362,34 @@ Readda.Store = (function () {
     return btoa(unescape(encodeURIComponent(JSON.stringify(pacco))));
   }
 
+  /* Il backup e' l'unica rete di sicurezza di un'app senza server: se il
+   * ripristino puo' rompere l'app, la rete non c'e'. Prima bastava un pacco
+   * con `profilo` ma senza `nick` per far saltare tutto con un TypeError e
+   * lasciare la schermata bianca, invece di dire "codice non valido". */
   function importa(stringa) {
     var pacco;
-    try { pacco = JSON.parse(decodeURIComponent(escape(atob(stringa.trim())))); }
+    try { pacco = JSON.parse(decodeURIComponent(escape(atob(String(stringa || '').trim())))); }
     catch (e) { return { ok: false, err: 'Codice non leggibile.' }; }
-    if (!pacco || !pacco.dati || !pacco.dati.profilo) return { ok: false, err: 'Codice non valido.' };
+    if (!pacco || typeof pacco !== 'object' || !pacco.dati) {
+      return { ok: false, err: 'Codice non valido.' };
+    }
+    var s = normalizzaStato(pacco.dati);
+    if (!s) return { ok: false, err: 'Il backup non contiene un account leggibile.' };
+    var nome = s.profilo.nick.trim();
+    if (nome.length < 2 || nome.length > 24) {
+      return { ok: false, err: 'Il backup ha un nickname non valido.' };
+    }
+    // il nickname si salva come si e' deciso di chiamarlo: senza questa riga
+    // la chiave era ripulita e il nome mostrato no, e lo spazio restava
+    // nell'intestazione di Io e in ogni esportazione successiva
+    s.profilo.nick = nome;
     var tutti = leggiTutti();
-    var chiave = pacco.dati.profilo.nick.toLowerCase();
-    tutti[chiave] = pacco.dati;
-    scriviTutti(tutti);
-    stato = pacco.dati; nick = chiave;
+    var chiave = nome.toLowerCase();
+    tutti[chiave] = s;
+    if (!scriviTutti(tutti)) return { ok: false, err: 'Memoria del browser non disponibile.' };
+    stato = s; nick = chiave;
     ricorda(chiave);
-    return { ok: true, nick: pacco.dati.profilo.nick };
+    return { ok: true, nick: nome };
   }
 
   function cancellaAccount() {
@@ -264,7 +406,9 @@ Readda.Store = (function () {
     parola: parola, segna: segna, registraUso: registraUso, registraProva: registraProva,
     dimentica: dimentica, perStato: perStato, contaVisti: contaVisti,
     tutteLeParole: function () { return stato.parole; },
-    strisciaViva: strisciaViva, fatteOggi: fatteOggi,
+    strisciaViva: strisciaViva, fatteOggi: fatteOggi, nuoveOggi: nuoveOggi,
+    oggiISO: oggiISO, ieriISO: ieriISO,
+    avvisatoOggi: avvisatoOggi, segnaAvviso: segnaAvviso,
     impostazioni: impostazioni, imposta: imposta,
     esporta: esporta, importa: importa, cancellaAccount: cancellaAccount,
     salva: salva,

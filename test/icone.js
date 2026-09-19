@@ -5,7 +5,6 @@ const fs = require('fs');
 
 const OLIVA = [0x20, 0x2B, 0x22];
 const ORO = [0xFF, 0xD8, 0x5F];
-const FONDO = [0x15, 0x1C, 0x17];
 
 function crc32(buf) {
   let c, tavola = [];

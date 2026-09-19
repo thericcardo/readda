@@ -71,7 +71,11 @@ Readda.App = (function () {
     instrada();
     salutaSeCiSonoScadenze();
 
-    if ('serviceWorker' in navigator && location.protocol.indexOf('http') === 0) {
+    // READDA_SENZA_SW lo mette strumenti/artefatto.py: dentro un artefatto
+    // la pagina non sta alla radice di un dominio suo e sw.js non viene
+    // pubblicato, quindi la registrazione fallirebbe a ogni apertura
+    if ('serviceWorker' in navigator && location.protocol.indexOf('http') === 0 &&
+        !window.READDA_SENZA_SW) {
       navigator.serviceWorker.register('sw.js').catch(function () { /* offline non disponibile */ });
     }
   }

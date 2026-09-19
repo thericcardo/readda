@@ -11,6 +11,9 @@ cosi' gli aggiornamenti aggiungono senza rimescolare quello che c'e'.
 """
 import json, os, re, sys, unicodedata, collections, argparse
 
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+import flessione
+
 QUI = os.path.dirname(os.path.abspath(__file__))
 RADICE = os.path.dirname(QUI)
 DATI = os.path.join(RADICE, 'data')
@@ -29,7 +32,7 @@ N_BLOCCHI     = 64      # fisso per sempre: cosi' aggiungere voci non sposta
 INDIZI = [
  ('medicina',  r'\b(malatt|sintom|terapi|clinic|diagnos|infiammaz|cura|paziente|medic|chirurg|farmac|organism|sangue|osseo|muscol|nerv)\w*'),
  ('diritto',   r'\b(legge|legale|giuridic|norma|reato|tribunal|contratt|sentenz|process|penale|civile|obblig|diritt|illecit)\w*'),
- ('lavoro',    r'\b(azienda|impresa|mercat|economic|commerc|finanz|денa|profitt|contabil|lavorativ|professional|industrial|produz)\w*'),
+ ('lavoro',    r'\b(azienda|impresa|mercat|economic|commerc|finanz|denar|profitt|contabil|lavorativ|professional|industrial|produz)\w*'),
  ('politica',  r'\b(stato|govern|politic|elettoral|pubblic|cittadin|social|societ|popolo|nazion|istituz|amministrat)\w*'),
  ('pensiero',  r'\b(ragionament|logic|filosof|concett|astratt|pensier|conoscenz|verit|argoment|deduz|teori|mente|intellett)\w*'),
  ('lingua',    r'\b(parola|termine|linguaggi|discors|frase|scrittur|letterari|stile|grammatic|retoric|espression|verbale|poesia|poetic)\w*'),
@@ -225,11 +228,18 @@ def esplicito(v):
 # ---------------------------------------- coerenza fra esempio e lemma
 def esempio_valido(es, lemma, forme):
     """Un esempio che non contiene la parola non e' un esempio: sulla carta
-    mostra una frase che non c'entra niente con il lemma."""
+    mostra una frase che non c'entra niente con il lemma.
+
+    Il troncamento da solo non basta a riconoscere la parola flessa: "Il
+    soldato ritrasse la pistola" veniva scartato da "ritrarre", e la carta
+    restava senza esempio. Le famiglie irregolari stanno in flessione.py e
+    sono le stesse che l'app usa per giudicare le frasi scritte a mano:
+    scartare qui un esempio che li' sarebbe accettato non avrebbe senso."""
     if not es: return False
     t = unicodedata.normalize('NFD', es.lower())
     t = ''.join(c for c in t if not unicodedata.combining(c))
-    radici = [radice_lemma(lemma)] + [f.lower() for f in (forme or [])]
+    radici = ([radice_lemma(lemma)] + flessione.derivate(lemma)
+              + [f.lower() for f in (forme or [])])
     return any(re.search(r'\b' + re.escape(r), t) for r in radici if len(r) >= 3)
 
 def livello(rango):
@@ -355,8 +365,12 @@ def scrivi(voci):
         blocchi[blocco_di(v['id'])].append(v)
 
     # 'forme' porta i participi irregolari: senza, il controllo delle frasi
-    # torna a rifiutare "ho eluso" per il lemma "eludere"
-    CAMPI = ('id', 'pos', 'sill', 'def', 'es', 'sin', 'dom', 'lvl', 'reg', 'etim', 'forme', 'sens')
+    # torna a rifiutare "ho eluso" per il lemma "eludere".
+    # 'curato' dice che la voce e' scritta a mano e non viene dal Wikizionario:
+    # senza, l'app attribuisce a una fonte esterna un testo che e' nostro, e
+    # FONTI.md dichiara un campo che nei dati pubblicati non c'e'.
+    CAMPI = ('id', 'pos', 'sill', 'def', 'es', 'sin', 'dom', 'lvl', 'reg', 'etim',
+             'forme', 'sens', 'curato')
     for n, blocco in enumerate(blocchi):
         blocco.sort(key=lambda x: x['id'])
         snello = [{k: v[k] for k in CAMPI if v.get(k)} for v in blocco]
