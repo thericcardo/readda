@@ -328,10 +328,22 @@ contrario. Una cosa vera l'ho trovata inseguendo il fantasma: la prima
 versione della correzione chiudeva l'involucro `npx` invece del server, che
 restava vivo — l'ho visto sondando la porta dopo l'uscita dello script.
 
-Per la prossima volta: **lo stato dei controlli va letto dai singoli lavori,
-non dal riepilogo.** Il riepilogo mente per qualche minuto, e con la postura
-«CI rossa è lavoro adesso» una bugia di qualche minuto basta a far inseguire
-un guasto inesistente.
+Per la prossima volta, in ordine di affidabilità:
+
+1. **Non interrogare niente: aspettare l'evento.** La sottoscrizione alla
+   richiesta recapita un `check_suite.completed` per ogni commit, e arriva
+   quando la suite è davvero finita. L'evento per il commit che credevo
+   piantato è arrivato alle 20:49:41 — cioè mentre ero convinto del
+   contrario. Era già lì, e non l'ho aspettato.
+2. Se serve chiedere, `list_workflow_runs` dà una `conclusion` attendibile
+   sulle corse chiuse.
+3. `get_check_runs` e lo stato a livello di corsa **no**: restano indietro di
+   minuti, e con la postura «CI rossa è lavoro adesso» qualche minuto di
+   bugia basta a far inseguire un guasto inesistente.
+
+Il punto non è solo che ho letto la fonte sbagliata: è che ho interrogato
+quando bastava aspettare. Sette minuti di attesa attiva contro un evento che
+sarebbe arrivato da solo, ed esatto.
 
 ---
 
