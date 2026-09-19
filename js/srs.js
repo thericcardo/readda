@@ -28,15 +28,26 @@ Readda.Srs = (function () {
   }
 
   /* Distrattori per il test a scelta multipla: definizioni di altri lemmi,
-   * preferendo quelli dello stesso dominio perché la scelta sia difficile. */
+   * preferendo quelli dello stesso dominio perché la scelta sia difficile.
+   *
+   * Si scartano per testo, non per identificatore. Nel corpus 38 definizioni
+   * compaiono su due voci diverse — «Che non si può cancellare» sta sia su
+   * "incancellabile" sia su "indelebile" — e un identificatore diverso non
+   * basta a garantire una risposta diversa: la stessa frase poteva comparire
+   * due volte, una segnata giusta e una sbagliata. */
   function distrattori(lemma, quanti) {
-    var tutti = Readda.Corpus.disponibili();
-    var stessoDominio = tutti.filter(function (l) {
-      return l.id !== lemma.id && l.dom.some(function (d) { return lemma.dom.indexOf(d) >= 0; });
+    // senza prototipo: una definizione che si chiamasse "constructor"
+    // risulterebbe gia' vista su un oggetto normale
+    var visti = Object.create(null);
+    visti[lemma.def] = true;
+    var vicini = [], lontani = [];
+    Readda.Corpus.disponibili().forEach(function (l) {
+      if (l.id === lemma.id || visti[l.def]) return;
+      visti[l.def] = true;
+      var stessoDominio = l.dom.some(function (d) { return lemma.dom.indexOf(d) >= 0; });
+      (stessoDominio ? vicini : lontani).push(l.def);
     });
-    var altri = tutti.filter(function (l) { return l.id !== lemma.id && stessoDominio.indexOf(l) < 0; });
-    var pozzo = mescola(stessoDominio).concat(mescola(altri));
-    return pozzo.slice(0, quanti).map(function (l) { return l.def; });
+    return mescola(vicini).concat(mescola(lontani)).slice(0, quanti);
   }
 
   function mescola(a) {

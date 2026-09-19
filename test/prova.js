@@ -152,6 +152,42 @@ const dist = R.distrattori(C.lemma('blandire'), 3);
 ok('tre distrattori generati', dist.length === 3);
 ok('nessun distrattore uguale alla definizione giusta', dist.every(d => d !== C.lemma('blandire').def));
 ok('distrattori distinti fra loro', new Set(dist).size === 3);
+ok('chiede sette distrattori e ne riceve sette',
+   R.distrattori(C.lemma('blandire'), 7).length === 7);
+{
+  /* Nel corpus 38 definizioni compaiono su due voci diverse: «Che non si
+     puo' cancellare» sta su piu' di un lemma. Escludere il solo
+     identificatore non bastava, e fra le quattro opzioni la stessa frase
+     poteva comparire due volte, una segnata giusta e una sbagliata:
+     qualunque risposta sarebbe stata sbagliata.
+
+     Su 13.589 voci la gemella finisce fra le prime tre estratte una volta
+     su quattromila, quindi provarlo sul corpus vero sarebbe teatro: qui il
+     corpus e' finto e ha cinque voci, cosi' la gemella esce per forza. */
+  const veroCorpus = ctx.Readda.Corpus;
+  const finte = [
+    { id: 'alfa',   def: 'Che non si puo\' cancellare.', dom: ['lingua'] },
+    { id: 'beta',   def: 'Che non si puo\' cancellare.', dom: ['lingua'] },
+    { id: 'gamma',  def: 'Definizione diversa uno.',      dom: ['lingua'] },
+    { id: 'delta',  def: 'Definizione diversa due.',      dom: ['scienza'] },
+    { id: 'epsilon',def: 'Definizione diversa tre.',      dom: ['scienza'] }
+  ];
+  ctx.Readda.Corpus = { disponibili: function () { return finte; } };
+
+  let ripetuta = 0, gemella = 0;
+  for (let i = 0; i < 300; i++) {
+    const d = R.distrattori(finte[0], 3);
+    if (new Set(d).size !== d.length) ripetuta++;
+    if (d.indexOf(finte[0].def) >= 0) gemella++;
+  }
+  ok('la definizione della voce gemella non compare mai fra i distrattori',
+     gemella === 0, gemella + ' volte su 300');
+  ok('i distrattori non si ripetono fra loro', ripetuta === 0, ripetuta);
+  ok('con un pozzo piccolo restituisce quanti ne trova, non opzioni vuote',
+     R.distrattori(finte[0], 10).length === 3, R.distrattori(finte[0], 10));
+
+  ctx.Readda.Corpus = veroCorpus;
+}
 
 gruppo('Striscia di giorni');
 ok('la striscia è attiva oggi', S.strisciaViva() >= 1, S.strisciaViva());

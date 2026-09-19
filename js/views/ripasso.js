@@ -60,6 +60,9 @@ Readda.Ripasso = (function () {
         Readda.Srs.distrattori(l, 3).map(function (d) { return { t: d, g: false }; })
       )
     );
+    // con pochi blocchi caricati i distrattori possono essere meno di tre:
+    // una scelta multipla con due opzioni e' inutile, meglio saltarla
+    if (opzioni.length < 3) { i++; render(); return; }
 
     U.rendi(
       intestazione() +
@@ -83,7 +86,6 @@ Readda.Ripasso = (function () {
       if (risposto) return;
       risposto = true;
       var giusto = e.currentTarget.getAttribute('data-g') === 'true';
-      U.su('.opz', 'click', function () {});
       var nodi = document.querySelectorAll('.opz');
       for (var k = 0; k < nodi.length; k++) {
         if (nodi[k].getAttribute('data-g') === 'true') nodi[k].classList.add('giusta');
@@ -91,10 +93,14 @@ Readda.Ripasso = (function () {
       }
       S.registraProva(l.id, giusto);
       var p = S.parola(l.id);
+      // l'esempio manca su tre voci su quattro: senza questo controllo
+      // la risposta sbagliata diceva "Non ancora." e poi il vuoto
       var testo = giusto
         ? '<b>Esatto.</b> Torna ' + U.quando(p.prox) + '.' +
           (p.stato === 'passiva' ? '<br>Ora la riconosci: il prossimo passo è usarla in una frase tua.' : '')
-        : '<b>Non ancora.</b> ' + U.esc(l.es) + '<br>Torna ' + U.quando(p.prox) + '.';
+        : '<b>Non ancora.</b> ' + U.esc(l.def) +
+          (l.es ? '<br><i>' + U.esc(l.es) + '</i>' : '') +
+          '<br>Torna ' + U.quando(p.prox) + '.';
       U.uno('#esito').innerHTML = '<div class="esito">' + testo + '</div>' +
         '<button class="btn btn-oro btn-pieno" id="avanti" style="margin-top:14px">Avanti</button>';
       U.uno('#avanti').addEventListener('click', function () { fatte++; i++; render(); });

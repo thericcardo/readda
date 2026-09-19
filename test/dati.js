@@ -204,6 +204,27 @@ gruppo('Il controllo delle frasi contro il corpus vero');
   }
 }
 
+gruppo('Distrattori della scelta multipla');
+{
+  /* Le definizioni non sono tutte diverse: la stessa frase puo' stare su due
+     voci ("Che non si puo' cancellare" vale per piu' di un lemma). I
+     distrattori escludevano il solo identificatore, quindi fra le quattro
+     opzioni la stessa frase poteva comparire due volte, una segnata giusta e
+     una sbagliata - e qualunque risposta sarebbe stata sbagliata. */
+  const gemelle = {};
+  L.forEach(v => { (gemelle[v.def] = gemelle[v.def] || []).push(v.id); });
+  const condivise = Object.keys(gemelle).filter(d => gemelle[d].length > 1);
+  ok('ci sono definizioni condivise da piu\' voci, quindi il caso e\' reale',
+     condivise.length > 0, condivise.length + ' definizioni su ' +
+     condivise.reduce((a, d) => a + gemelle[d].length, 0) + ' voci');
+
+  /* Qui si constata solo che il caso esiste nei dati: provare che i
+     distrattori lo evitano su 13.589 voci sarebbe teatro, perche' la voce
+     gemella finisce fra le prime tre estratte una volta su quattromila.
+     La prova vera sta in test/prova.js, su un corpus finto di cinque voci
+     dove la gemella esce per forza. */
+}
+
 gruppo('Lessico esplicito');
 const segnate = L.filter(v => v.sens);
 ok('qualche voce e\' segnata', segnate.length > 0, segnate.length);

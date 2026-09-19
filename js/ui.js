@@ -81,9 +81,16 @@ Readda.Ui = (function () {
     lavoro: 'Lavoro', diritto: 'Diritto', politica: 'Società', pensiero: 'Ragionamento',
     scuola: 'Scuola', scienza: 'Scienza', lingua: 'Lingua', tecnologia: 'Tecnologia',
     emozioni: 'Emozioni', tempo: 'Tempo', storia: 'Storia', natura: 'Natura',
-    medicina: 'Salute', cucina: 'Cucina', arte: 'Arte', generale: 'Generale'
+    medicina: 'Salute', cucina: 'Cucina', arte: 'Arte', generale: 'Generale',
+    // "altro" non e' un dominio del corpus: e' la risposta "nessuna di
+    // queste" alla prima domanda, e nella testata di Io compariva minuscola
+    altro: 'Altro'
   };
-  function nomeDominio(d) { return NOMI_DOMINIO[d] || d; }
+  function nomeDominio(d) {
+    if (!d) return 'Generale';
+    if (NOMI_DOMINIO[d]) return NOMI_DOMINIO[d];
+    return d.charAt(0).toUpperCase() + d.slice(1);
+  }
 
   function quando(ms) {
     var d = ms - Date.now();
