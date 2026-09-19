@@ -77,8 +77,12 @@ Readda.Ui = (function () {
     velo.addEventListener('click', function (e) { if (e.target === velo) chiudi(); });
     document.addEventListener('keydown', onTasto);
 
+    /* Il fuoco va sul primo campo da riempire, se c'e', altrimenti sul
+     * foglio stesso. Non sul primo bottone: il foglio che chiede «Cancellare
+     * tutto?» comincia con «Si', cancella», e metterci sopra il fuoco vuol
+     * dire che un Invio distratto cancella l'account. */
     var dentro = velo.querySelector('.foglio');
-    var primoCampo = dentro.querySelector('input, textarea, button');
+    var primoCampo = dentro.querySelector('input:not([readonly]), textarea:not([readonly])');
     (primoCampo || dentro).focus();
 
     if (onAperto) onAperto(dentro, chiudi);

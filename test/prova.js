@@ -294,8 +294,20 @@ gruppo('Backup malformati e account di versioni precedenti');
   ok('ogni parola ha i contatori numerici',
      Object.keys(parole).every(k => typeof parole[k].box === 'number' &&
        typeof parole[k].prox === 'number' && typeof parole[k].ok === 'number'));
-  ok('le parole senza uno stato valido vengono scartate',
-     !parole.rumore && !parole.vuota && !!parole.blandire, Object.keys(parole));
+  /* Uno stato sconosciuto puo' venire da una versione piu' recente: il
+     record resta dov'e' - cancellare dati altrui per non saperli leggere e'
+     la scelta peggiore - e semplicemente non compare in nessun elenco. */
+  ok('un valore che non e\' nemmeno un oggetto sparisce', !parole.vuota);
+  ok('una parola con uno stato sconosciuto viene conservata', !!parole.rumore);
+  ok('ma non compare in nessun elenco',
+     S.perStato('ignota').indexOf('rumore') < 0 &&
+     S.perStato('passiva').indexOf('rumore') < 0 &&
+     S.perStato('attiva').indexOf('rumore') < 0 &&
+     R.scadenze(parole).every(x => x.id !== 'rumore'));
+  ok('e non viene contata fra le parole incontrate',
+     S.contaVisti() === S.perStato('ignota').length + S.perStato('passiva').length +
+                        S.perStato('attiva').length,
+     { contaVisti: S.contaVisti(), inElenco: Object.keys(parole).length });
   ok('le impostazioni mancanti prendono il valore di partenza',
      S.impostazioni().dose === 15 && S.impostazioni().esplicito === false, S.impostazioni());
   ok('un profilo senza codice ne riceve uno',

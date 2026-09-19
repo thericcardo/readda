@@ -53,10 +53,17 @@ Readda.Store = (function () {
     if (typeof p.dal !== 'number') p.dal = 0;
     if (typeof p.ultimo !== 'number') p.ultimo = p.dal;
     p.bluff = !!p.bluff;
-    // senza uno stato la parola non appartiene a nessun elenco: e' rumore
-    if (['ignota', 'passiva', 'attiva'].indexOf(p.stato) < 0) return null;
     return p;
   }
+
+  /* Uno stato che non conosciamo non e' per forza spazzatura: puo' venire da
+   * una versione piu' recente dell'app, o da una che verra'. Il record resta
+   * dov'e' - cancellare dati altrui per non saperli leggere e' la scelta
+   * peggiore possibile - e semplicemente non compare in nessun elenco: il
+   * ripasso lo salta, la raccolta filtra per stato, e il conteggio delle
+   * parole incontrate non lo somma. */
+  var STATI = ['ignota', 'passiva', 'attiva'];
+  function statoValido(p) { return !!p && STATI.indexOf(p.stato) >= 0; }
 
   function normalizzaStato(s) {
     if (!s || typeof s !== 'object' || !s.profilo || typeof s.profilo.nick !== 'string') return null;
@@ -70,6 +77,7 @@ Readda.Store = (function () {
     if (!s.parole || typeof s.parole !== 'object') s.parole = {};
     for (var id in s.parole) {
       if (!s.parole.hasOwnProperty(id)) continue;
+      // solo i valori che non sono nemmeno oggetti se ne vanno
       if (!normalizzaParola(s.parole[id])) delete s.parole[id];
     }
 
@@ -265,7 +273,13 @@ Readda.Store = (function () {
     return out;
   }
 
-  function contaVisti() { return Object.keys(stato.parole).length; }
+  function contaVisti() {
+    var n = 0;
+    for (var id in stato.parole) {
+      if (stato.parole.hasOwnProperty(id) && statoValido(stato.parole[id])) n++;
+    }
+    return n;
+  }
 
   /* ---------- striscia di giorni ----------
    *

@@ -288,6 +288,11 @@ function gruppo(n) { console.log('\n' + n); }
          await page.getAttribute('.foglio', 'aria-modal') === 'true');
       ok('il fuoco entra nel foglio',
          await page.evaluate(() => !!document.activeElement.closest('.foglio')));
+      // il foglio della raccolta non ha campi: il fuoco sta sul contenitore,
+      // non sul bottone «Toglila dalla raccolta»
+      ok('il fuoco non finisce su un bottone che fa qualcosa',
+         await page.evaluate(() => document.activeElement.tagName !== 'BUTTON'),
+         await page.evaluate(() => document.activeElement.tagName));
       await page.keyboard.press('Escape');
       await page.waitForTimeout(320);
       ok('Esc lo chiude', await page.locator('.foglio').count() === 0);
@@ -299,6 +304,23 @@ function gruppo(n) { console.log('\n' + n); }
     } else {
       ok('nessuna voce in raccolta: foglio non verificabile', true, 'saltato');
     }
+  }
+
+  {
+    /* Il foglio che chiede «Cancellare tutto?» comincia con «Si', cancella»:
+       se il fuoco ci finisse sopra, un Invio distratto cancellerebbe
+       l'account. */
+    await page.click('.tab[data-rotta="#/io"]');
+    await page.waitForSelector('#cancella');
+    await page.click('#cancella');
+    await page.waitForSelector('#si');
+    ok('nel foglio di cancellazione il fuoco non sta sul bottone distruttivo',
+       await page.evaluate(() => document.activeElement.id !== 'si'),
+       await page.evaluate(() => document.activeElement.id || document.activeElement.className));
+    await page.keyboard.press('Escape');
+    await page.waitForTimeout(320);
+    ok('e l\'account esiste ancora',
+       await page.evaluate(() => Readda.Store.caricato()) === true);
   }
 
   gruppo('La dose ferma il flusso, e lascia una porta');
