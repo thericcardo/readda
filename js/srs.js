@@ -35,7 +35,7 @@ Readda.Srs = (function () {
    * "incancellabile" sia su "indelebile" — e un identificatore diverso non
    * basta a garantire una risposta diversa: la stessa frase poteva comparire
    * due volte, una segnata giusta e una sbagliata. */
-  function distrattori(lemma, quanti) {
+  function distrattori(lemma, quanti, esplicito) {
     // senza prototipo: una definizione che si chiamasse "constructor"
     // risulterebbe gia' vista su un oggetto normale
     var visti = Object.create(null);
@@ -43,11 +43,19 @@ Readda.Srs = (function () {
     var vicini = [], lontani = [];
     Readda.Corpus.disponibili().forEach(function (l) {
       if (l.id === lemma.id || visti[l.def]) return;
+      // l'interruttore promette che il lessico esplicito resta fuori: se
+      // vale per il flusso deve valere anche per le risposte sbagliate,
+      // altrimenti la promessa si rompe proprio dove non te l'aspetti
+      if (l.sens && !esplicito) return;
       visti[l.def] = true;
       var stessoDominio = l.dom.some(function (d) { return lemma.dom.indexOf(d) >= 0; });
       (stessoDominio ? vicini : lontani).push(l.def);
     });
-    return mescola(vicini).concat(mescola(lontani)).slice(0, quanti);
+    // i lontani si mescolano solo se servono davvero: sono migliaia, e
+    // rimescolarli per scartarne tutti tranne tre e' lavoro buttato
+    var presi = mescola(vicini).slice(0, quanti);
+    if (presi.length < quanti) presi = presi.concat(mescola(lontani).slice(0, quanti - presi.length));
+    return presi;
   }
 
   function mescola(a) {

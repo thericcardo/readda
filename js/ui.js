@@ -113,9 +113,14 @@ Readda.Ui = (function () {
     // queste" alla prima domanda, e nella testata di Io compariva minuscola
     altro: 'Altro'
   };
+  /* `NOMI_DOMINIO[d]` da solo raggiunge anche il prototipo: nomeDominio
+   * ('constructor') restituiva il sorgente di Object dentro un'etichetta.
+   * E `d` puo' non essere una stringa, se arriva da un backup scritto a
+   * mano: `d.charAt` lanciava e la schermata Io restava bianca. */
   function nomeDominio(d) {
     if (!d) return 'Generale';
-    if (NOMI_DOMINIO[d]) return NOMI_DOMINIO[d];
+    d = String(d);
+    if (Object.prototype.hasOwnProperty.call(NOMI_DOMINIO, d)) return NOMI_DOMINIO[d];
     return d.charAt(0).toUpperCase() + d.slice(1);
   }
 

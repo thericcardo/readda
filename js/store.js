@@ -67,7 +67,9 @@ Readda.Store = (function () {
 
   function normalizzaStato(s) {
     if (!s || typeof s !== 'object' || !s.profilo || typeof s.profilo.nick !== 'string') return null;
-    var base = vuoto(s.profilo.nick, s.profilo.codice || generaCodice());
+    // generaCodice() solo se serve: valutarlo sempre vorrebbe dire sorteggiare
+    // e buttare via un codice a ogni caricamento di account
+    var base = vuoto(s.profilo.nick, s.profilo.codice ? s.profilo.codice : generaCodice());
     var k;
     for (k in base.profilo) {
       if (base.profilo.hasOwnProperty(k) && s.profilo[k] === undefined) s.profilo[k] = base.profilo[k];
@@ -377,6 +379,10 @@ Readda.Store = (function () {
     if (nome.length < 2 || nome.length > 24) {
       return { ok: false, err: 'Il backup ha un nickname non valido.' };
     }
+    // il nickname si salva come si e' deciso di chiamarlo: senza questa riga
+    // la chiave era ripulita e il nome mostrato no, e lo spazio restava
+    // nell'intestazione di Io e in ogni esportazione successiva
+    s.profilo.nick = nome;
     var tutti = leggiTutti();
     var chiave = nome.toLowerCase();
     tutti[chiave] = s;

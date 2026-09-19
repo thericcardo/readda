@@ -95,9 +95,16 @@ Readda.Feed = (function () {
 
   function smonta() { if (scollegaTasti) { scollegaTasti(); scollegaTasti = null; } }
 
+  /* I tasti valgono solo quando c'e' una carta davanti. Senza questo
+   * controllo, sulla schermata di pausa (o su quella di fine flusso) uno
+   * spazio giudicava una parola mai vista - e, siccome preventDefault()
+   * partiva comunque, non azionava nemmeno il bottone su cui stava il
+   * fuoco: chi usa la tastiera restava chiuso dentro, perdendo una parola
+   * a ogni tentativo di uscire. */
   function collegaTasti() {
     function onTasto(e) {
       if (e.target && /INPUT|TEXTAREA/.test(e.target.tagName)) return;
+      if (!U.uno('#carta-viva')) return;
       if (e.key === '1') giudica('ignota');
       else if (e.key === '2') giudica('passiva');
       else if (e.key === '3' || e.key === 'ArrowUp' || e.key === ' ') { e.preventDefault(); giudica('attiva'); }
@@ -139,6 +146,11 @@ Readda.Feed = (function () {
       '</article>';
   }
 
+  function azioni(visibili) {
+    var el = U.uno('#azioni');
+    if (el) el.style.display = visibili ? '' : 'none';
+  }
+
   function mostra() {
     var pila = U.uno('#pila');
     if (!pila) return;
@@ -147,6 +159,10 @@ Readda.Feed = (function () {
     if (indice >= coda.length) { finito(); return; }
     var prossima = coda[indice + 1];
     pila.innerHTML = (prossima ? cartaHtml(prossima, true) : '') + cartaHtml(coda[indice], false);
+    // pausa() e finito() le nascondono: se una carta ricompare - per esempio
+    // perche' un rifornimento e' arrivato dopo la schermata di fine - vanno
+    // rimesse, altrimenti resta una carta senza i suoi tre bottoni
+    azioni(true);
     collegaTrascinamento(U.uno('#carta-viva'));
   }
 
@@ -168,12 +184,12 @@ Readda.Feed = (function () {
         (d.totale > 0 ? '<button class="btn btn-oro" id="vai-ripasso" style="margin-top:20px">Vai al ripasso</button>' : '') +
         '<button class="btn btn-muto" id="oltre" style="margin-top:10px">Continua lo stesso</button>' +
       '</div>';
-    U.uno('#azioni').style.display = 'none';
+    azioni(false);
     var b = U.uno('#vai-ripasso');
     if (b) b.addEventListener('click', function () { Readda.App.vai('#/ripasso'); });
     U.uno('#oltre').addEventListener('click', function () {
       doseIgnorataIl = S.oggiISO();
-      U.uno('#azioni').style.display = '';
+      azioni(true);
       // se la pausa e' comparsa all'apertura, i blocchi non sono mai stati
       // caricati e la coda e' vuota: va composta adesso
       if (coda.length > indice) mostra(); else apri();
@@ -192,7 +208,7 @@ Readda.Feed = (function () {
         '</p>' +
         (d.totale > 0 ? '<button class="btn btn-oro" id="vai-ripasso" style="margin-top:20px">Vai al ripasso</button>' : '') +
       '</div>';
-    U.uno('#azioni').style.display = 'none';
+    azioni(false);
     var b = U.uno('#vai-ripasso');
     if (b) b.addEventListener('click', function () { Readda.App.vai('#/ripasso'); });
   }

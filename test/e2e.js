@@ -348,25 +348,41 @@ function gruppo(n) { console.log('\n' + n); }
       giri++;
     }
     ok('il flusso si ferma alla dose', await page.locator('#oltre').count() === 1);
-    ok('la barra non supera la dose', (await page.textContent('#dose-txt')) === '10 / 10',
-       await page.textContent('#dose-txt'));
-    ok('le azioni sono nascoste mentre il flusso e\' fermo',
-       await page.locator('#azioni').isHidden() ||
-       (await page.getAttribute('#azioni', 'style') || '').indexOf('display: none') >= 0);
 
-    // la pausa resta anche tornando indietro alla scheda
+    /* I tasti restavano attivi sulla schermata di pausa: uno spazio
+       giudicava una parola mai vista e, siccome preventDefault() partiva
+       comunque, non azionava nemmeno il bottone su cui stava il fuoco. */
+    const primaDeiTasti = await page.evaluate(() => Readda.Store.nuoveOggi());
+    await page.keyboard.press('Space');
+    await page.keyboard.press('1');
+    await page.keyboard.press('2');
+    await page.waitForTimeout(400);
+    ok('i tasti non giudicano parole mentre il flusso e\' fermo',
+       await page.evaluate(() => Readda.Store.nuoveOggi()) === primaDeiTasti,
+       { prima: primaDeiTasti, dopo: await page.evaluate(() => Readda.Store.nuoveOggi()) });
+    ok('e la pausa e\' ancora li\'', await page.locator('#oltre').count() === 1);
+
+    // lo spazio deve poter azionare il bottone, che e' il punto
+    await page.focus('#oltre');
+    await page.keyboard.press('Space');
+    await page.waitForSelector('#carta-viva');
+    ok('lo spazio sul bottone «Continua lo stesso» funziona',
+       await page.locator('#carta-viva').count() === 1);
+    ok('e i tre bottoni del flusso tornano visibili',
+       await page.locator('[data-giudizio]').first().isVisible());
+    // si rimette la pausa per le prove che seguono
     await page.click('.tab[data-rotta="#/collezione"]');
     await page.waitForSelector('.filtri');
     await page.click('.tab[data-rotta="#/feed"]');
-    await page.waitForSelector('#oltre');
-    ok('la pausa non si dimentica cambiando scheda', await page.locator('#oltre').count() === 1);
-
-    await page.click('#oltre');
     await page.waitForSelector('#carta-viva');
-    ok('«Continua lo stesso» rimette una carta', await page.locator('#carta-viva').count() === 1);
+    ok('la barra non supera la dose', (await page.textContent('#dose-txt')) === '10 / 10',
+       await page.textContent('#dose-txt'));
+
+    ok('la scelta di continuare vale per tutta la giornata',
+       await page.locator('#carta-viva').count() === 1);
     await page.click('[data-giudizio="attiva"]');
     await page.waitForTimeout(340);
-    ok('dopo l\'uscita esplicita il flusso non si ferma piu\' oggi',
+    ok('e non si rimette in mezzo a ogni carta',
        await page.locator('#carta-viva').count() === 1);
 
     // si rimette la dose alta, cosi' le prove successive trovano il flusso aperto

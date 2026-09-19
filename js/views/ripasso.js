@@ -57,12 +57,21 @@ Readda.Ripasso = (function () {
   function provaRiconoscimento(l) {
     var opzioni = Readda.Srs.mescola(
       [{ t: l.def, g: true }].concat(
-        Readda.Srs.distrattori(l, 3).map(function (d) { return { t: d, g: false }; })
+        Readda.Srs.distrattori(l, 3, S.impostazioni().esplicito)
+          .map(function (d) { return { t: d, g: false }; })
       )
     );
-    // con pochi blocchi caricati i distrattori possono essere meno di tre:
-    // una scelta multipla con due opzioni e' inutile, meglio saltarla
-    if (opzioni.length < 3) { i++; render(); return; }
+    /* Con pochi blocchi caricati i distrattori possono essere meno di tre, e
+       una scelta multipla con due opzioni non prova niente. La voce si salta
+       - ma va anche rimandata: lasciandole `prox` nel passato resterebbe
+       scaduta per sempre, il pallino del ripasso non si spegnerebbe mai e il
+       promemoria parlerebbe ogni giorno di una parola che il ripasso si
+       rifiuta di mostrare. */
+    if (opzioni.length < 4) {
+      var w = S.parola(l.id);
+      if (w) { w.prox = Date.now() + Readda.Srs.intervallo(0); S.salva(); }
+      i++; render(); return;
+    }
 
     U.rendi(
       intestazione() +

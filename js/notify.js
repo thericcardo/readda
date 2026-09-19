@@ -18,8 +18,12 @@ Readda.Notifiche = (function () {
     return Notification.requestPermission();
   }
 
+  /* Restituisce true solo se la notifica e' partita davvero. Serve a
+   * controlla(): segnare il promemoria del giorno quando non e' uscito
+   * niente costa a chi legge il promemoria di quel giorno, e per sempre
+   * sui browser dove la notifica non parte mai. */
   function invia(titolo, corpo) {
-    if (permesso() !== 'granted') return;
+    if (permesso() !== 'granted') return false;
     try {
       new Notification(titolo, {
         body: corpo,
@@ -28,7 +32,11 @@ Readda.Notifiche = (function () {
         tag: 'readda-ripasso',
         renotify: false
       });
-    } catch (e) { /* alcuni browser richiedono il service worker: si ignora */ }
+      return true;
+    } catch (e) {
+      // alcuni browser richiedono il service worker: non e' partita
+      return false;
+    }
   }
 
   /* Quante voci sono scadute adesso, divise per tipo. */
@@ -83,8 +91,7 @@ Readda.Notifiche = (function () {
     var d = dovute();
     if (d.totale === 0) return;
     var m = messaggio(d);
-    invia(m.titolo, m.corpo);
-    Readda.Store.segnaAvviso();
+    if (invia(m.titolo, m.corpo)) Readda.Store.segnaAvviso();
   }
 
   function avvia() {

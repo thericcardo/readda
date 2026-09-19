@@ -191,6 +191,48 @@ ok('chiede sette distrattori e ne riceve sette',
   ctx.Readda.Corpus = veroCorpus;
 }
 
+gruppo('Difetti trovati rileggendo il proprio lavoro');
+{
+  /* L'interruttore del lessico esplicito promette che quelle voci restano
+     fuori dal flusso. Se la promessa non vale anche per le risposte
+     sbagliate della scelta multipla, si rompe proprio dove non te
+     l'aspetti. Misurato: 2 definizioni esplicite su 900 distrattori. */
+  const esplicite = new Set(L.filter(x => x.sens).map(x => x.def));
+  ok('nel campione ci sono voci esplicite, quindi la prova ha senso',
+     esplicite.size > 0, esplicite.size);
+  let trapelate = 0;
+  const bersaglio = C.lemma('blandire');
+  for (let i = 0; i < 300; i++) {
+    R.distrattori(bersaglio, 3, false).forEach(d => { if (esplicite.has(d)) trapelate++; });
+  }
+  ok('col filtro spento nessun distrattore e\' esplicito', trapelate === 0, trapelate);
+  let ammesse = 0;
+  for (let i = 0; i < 300; i++) {
+    R.distrattori(bersaglio, 3, true).forEach(d => { if (esplicite.has(d)) ammesse++; });
+  }
+  ok('col filtro acceso tornano disponibili', ammesse > 0, ammesse);
+
+  /* nomeDominio leggeva anche il prototipo, e chiamava charAt su tutto. */
+  const U = ctx.Readda.Ui;
+  ok('un nome che esiste sul prototipo non diventa un\'etichetta',
+     U.nomeDominio('constructor') === 'Constructor', U.nomeDominio('constructor'));
+  ok('un valore non testuale non fa saltare la schermata',
+     (function () { try { return typeof U.nomeDominio(5) === 'string'; } catch (e) { return false; } })());
+  ok('i domini veri restano quelli di sempre',
+     U.nomeDominio('politica') === 'Societ\u00e0' && U.nomeDominio('medicina') === 'Salute');
+
+  /* importa() validava il nickname ripulito e ne salvava un altro. */
+  const spaziato = ctx.btoa(unescape(encodeURIComponent(JSON.stringify({
+    v: 1, dati: { profilo: { nick: '  Spaziato  ' }, parole: {} }
+  }))));
+  const r2 = S.importa(spaziato);
+  ok('il nickname importato viene ripulito una volta sola',
+     r2.ok && S.profilo().nick === 'Spaziato', { esito: r2, salvato: S.profilo().nick });
+  ok('e l\'esportazione non riporta gli spazi',
+     JSON.parse(decodeURIComponent(escape(ctx.atob(S.esporta())))).dati.profilo.nick === 'Spaziato');
+  S.entra('Riccardo');
+}
+
 gruppo('Striscia di giorni');
 ok('la striscia è attiva oggi', S.strisciaViva() >= 1, S.strisciaViva());
 ok('conteggio di oggi coerente', S.fatteOggi() > 0);
