@@ -35,6 +35,13 @@ import costruisci        # tipografia, N_BLOCCHI, blocco_di
 # chiusa con il punto da tipografia(): quel punto traveste un monco da frase
 # intera. Lunghezze inferiori non possono venire dal taglio, perche' fra il
 # taglio e la scrittura si perde al massimo uno spazio.
+#
+# La firma vale perche' la pipeline di adesso non puo' piu' produrla: taglia()
+# chiude ogni testo tagliato con un segno di frase o con i puntini, e si ferma
+# sotto il tetto proprio per lasciare posto al punto di tipografia(). Lo
+# verifica `python3 strumenti/estrai.py --autoprova`, che test/dati.js esegue.
+# Senza quella garanzia, tetto+1 potrebbe capitare anche a un testo sano e
+# questo strumento lo accorcerebbe per niente.
 TETTO_DEF = 260
 TETTO_ES = 200
 

@@ -113,6 +113,14 @@ Le quattro suite, in ordine di quanto sono lente:
 | `test/documenti.js` | Che i numeri scritti qui siano quelli di `data/manifesto.js` |
 | `test/e2e.js` | L'app vera in Chromium, con le schermate |
 
+Due controlli della pipeline si eseguono anche da soli, e `test/dati.js` li
+richiama:
+
+```bash
+python3 strumenti/estrai.py --autoprova   # l'invariante del taglio a 260/200
+python3 strumenti/ripara.py --controlla   # i blocchi sono allineati alla pipeline?
+```
+
 `test/e2e.js` vuole un server attivo sulla porta 8777 (`npm run servi`) e
 Chromium; scrive le schermate in `scatti/`.
 

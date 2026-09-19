@@ -37,19 +37,43 @@ CONFINE_FRASE = re.compile(r'[.!?;](?=[\s)]|$)')
 
 def chiudi_taglio(pezzo, minimo=60):
     """Da un testo interrotto a meta' ricava un testo che finisce dove finisce
-    una frase; se non ce n'e' una abbastanza lunga, dove finisce una parola."""
+    una frase; se non ce n'e' una abbastanza lunga, dove finisce una parola.
+
+    Invariante: il risultato non e' mai piu' lungo di `pezzo`, e non finisce
+    mai nel mezzo di una parola senza dirlo. La seconda meta' conta quanto la
+    prima: costruisci.tipografia() aggiunge un punto a cio' che non ne ha, e
+    un monco chiuso dal punto sembra una frase intera. Chiudendo con i
+    puntini il punto non viene aggiunto, e la lunghezza resta sotto il tetto:
+    e' quello che permette a test/dati.js e a ripara.py di riconoscere un
+    taglio vecchio dalla sola lunghezza.
+    """
     confini = list(CONFINE_FRASE.finditer(pezzo))
     if confini and confini[-1].start() >= minimo:
         t = pezzo[:confini[-1].start() + 1].rstrip()
         return t[:-1] + '.' if t.endswith(';') else t
     spazio = pezzo.rstrip().rfind(' ')
-    if spazio < minimo:
-        return pezzo.rstrip()
-    return pezzo[:spazio].rstrip(' ,;:(\u00ab"\'') + '\u2026'
+    if spazio >= minimo:
+        return pezzo[:spazio].rstrip(' ,;:(\u00ab"\'') + '\u2026'
+    # nessuno spazio su cui appoggiarsi: una sola parola lunghissima, o testo
+    # senza spazi uscito dal markup. Si accorcia di un carattere per fare
+    # posto ai puntini, cosi' l'invariante di lunghezza regge lo stesso.
+    return pezzo[:-1].rstrip(' ,;:(\u00ab"\'') + '\u2026'
 
 def taglia(t, limite, minimo=60):
-    """Taglia a `limite` caratteri senza spezzare una parola a meta'."""
-    if len(t) <= limite:
+    """Taglia a `limite` caratteri senza spezzare una parola a meta'.
+
+    La soglia e' `< limite`, non `<= limite`, e la differenza di un carattere
+    vale la riga di spiegazione. tipografia() aggiunge un punto a cio' che non
+    ne ha: un testo lungo esattamente `limite` e senza punto finale
+    diventerebbe lungo `limite + 1`, che e' la firma con cui test/dati.js e
+    ripara.py riconoscono un troncamento vecchio. Lasciandolo passare, la
+    firma smetterebbe di voler dire qualcosa.
+
+    Il prezzo e' che una definizione lunga per davvero esattamente `limite`
+    caratteri viene riportata alla sua ultima frase. E' una perdita piccola e
+    circoscritta; l'alternativa e' un criterio che nessuno puo' verificare.
+    """
+    if len(t) < limite:
         return t
     return chiudi_taglio(t[:limite], minimo)
 
@@ -247,10 +271,56 @@ def main(dump, uscita):
         json.dump(voci, f, ensure_ascii=False)
     return len(voci)
 
+def autoprova():
+    """Verifica l'invariante di taglia() su testo generato.
+
+    Serve perche' la meta' del repository che sta a valle - test/dati.js e
+    ripara.py - riconosce un troncamento vecchio dalla sola lunghezza. Se
+    questo file tornasse a produrre `limite + 1`, quella firma smetterebbe di
+    voler dire qualcosa e i due si metterebbero a riparare dati sani.
+
+        python3 strumenti/estrai.py --autoprova
+    """
+    import random, string, sys as _sys, os as _os
+    _sys.path.insert(0, _os.path.dirname(_os.path.abspath(__file__)))
+    import costruisci
+
+    random.seed(20260919)
+    alfabeto = string.ascii_lowercase + '  .,;()\u00e0\u00e8'
+    rotti, provati = [], 0
+    for _ in range(6000):
+        t = ''.join(random.choice(alfabeto) for _ in range(random.randint(0, 700)))
+        for limite in (260, 200, 180):
+            provati += 1
+            fuori = costruisci.tipografia(taglia(t, limite))
+            if len(fuori) > limite:
+                rotti.append((limite, len(fuori), t[:40]))
+    # i casi al confine, che il caso generato coglie di rado
+    for limite in (260, 200, 180):
+        for n in (limite - 2, limite - 1, limite, limite + 1):
+            for coda in ('b', '.', ' '):
+                provati += 1
+                t = 'Una prima frase. ' + 'a' * max(n - 18, 0) + coda
+                fuori = costruisci.tipografia(taglia(t, limite))
+                if len(fuori) > limite:
+                    rotti.append((limite, len(fuori), t[:40]))
+
+    print('taglia(): %d casi, %d violazioni dell\'invariante' % (provati, len(rotti)))
+    for r in rotti[:5]:
+        print('  limite %d, uscita lunga %d, da %r' % r)
+    return 1 if rotti else 0
+
+
 if __name__ == '__main__':
     import argparse
     ap = argparse.ArgumentParser(description='Estrae le voci italiane dal dump del Wikizionario.')
-    ap.add_argument('--dump', required=True, help='itwiktionary-latest-pages-articles.xml.bz2')
+    ap.add_argument('--dump', help='itwiktionary-latest-pages-articles.xml.bz2')
     ap.add_argument('--uscita', default='grezzo.json')
+    ap.add_argument('--autoprova', action='store_true',
+                    help='verifica l\'invariante di taglia() e esce')
     a = ap.parse_args()
+    if a.autoprova:
+        sys.exit(autoprova())
+    if not a.dump:
+        ap.error('serve --dump (oppure --autoprova)')
     main(a.dump, a.uscita)

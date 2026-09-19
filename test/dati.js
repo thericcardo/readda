@@ -86,7 +86,28 @@ const esTagliati = L.filter(v => v.es && v.es.length === TETTO_ES + 1);
 ok('nessun esempio tagliato a meta\' parola', esTagliati.length === 0,
    esTagliati.slice(0, 5).map(v => v.id + ' …' + v.es.slice(-40)));
 ok('nessun testo supera il proprio tetto',
-   L.every(v => v.def.length <= TETTO_DEF + 1 && (!v.es || v.es.length <= TETTO_ES + 1)));
+   L.every(v => v.def.length <= TETTO_DEF && (!v.es || v.es.length <= TETTO_ES)),
+   L.filter(v => v.def.length > TETTO_DEF).slice(0, 3).map(v => v.id + ' ' + v.def.length));
+
+/* Che nei dati non ci sia piu' un testo lungo tetto+1 vale poco se la
+   pipeline puo' ricrearlo. `taglia()` in estrai.py garantisce che il testo
+   tagliato, dopo il punto che tipografia() aggiunge, non superi mai il
+   tetto: e' quella garanzia a dare un significato alla firma che le due
+   asserzioni qui sopra cercano. La verifica sta accanto al codice che
+   controlla, e si esegue anche a mano. */
+{
+  const cp = require('child_process');
+  try {
+    const esito = cp.execFileSync('python3',
+      [path.join(RADICE, 'strumenti', 'estrai.py'), '--autoprova'],
+      { encoding: 'utf8' });
+    ok('il taglio della pipeline non puo\' ricreare la firma del troncamento',
+       /0 violazioni/.test(esito), esito.trim().split('\n').slice(0, 4));
+  } catch (e) {
+    ok('il taglio della pipeline non puo\' ricreare la firma del troncamento',
+       false, (e.stdout || e.message || '').toString().split('\n').slice(0, 4));
+  }
+}
 
 ok('ogni definizione comincia in maiuscola o con un segno',
    L.every(v => !/^[a-zà-ú]/.test(v.def)), campione(L.filter(v => /^[a-zà-ú]/.test(v.def))));
