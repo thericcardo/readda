@@ -17,11 +17,41 @@ RE_LINKP  = re.compile(r'\{\{\s*Linkp[^}]*\}\}', re.I)
 RE_TMPL   = re.compile(r'\{\{[^{}]*\}\}')
 RE_WLINK2 = re.compile(r'\[\[[^\]|]*\|([^\]]*)\]\]')
 RE_WLINK1 = re.compile(r'\[\[([^\]]*)\]\]')
+# collegamento esterno: [url etichetta]. Senza questa, "sicofante" pubblicava
+# la definizione con dentro un indirizzo di Wikipedia per esteso.
+RE_ELINK  = re.compile(r'\[(?:https?|ftp)://\S+\s+([^\]]*)\]')
 RE_ITAL   = re.compile(r"'''?")
 RE_HTML   = re.compile(r'<[^>]+>')
 RE_SPAZI  = re.compile(r'\s+')
 
 RE_PN = re.compile(r'\{\{\s*Pn\s*(\|[^}]*)?\}\}', re.I)
+
+# ---------- taglio del testo ----------
+# Definizioni ed esempi hanno un tetto di caratteri, perche' una carta che non
+# sta in una schermata non si legge. Tagliare al carattere numero N pero'
+# spezza l'ultima parola a meta', e la maiuscola e il punto aggiunti dopo
+# travestono il monco da frase intera: "... attraverso l." sembra finita e non
+# lo e'. Si taglia quindi dove finisce una frase, o almeno dove finisce una
+# parola, e in quel secondo caso i puntini dicono che il testo prosegue.
+CONFINE_FRASE = re.compile(r'[.!?;](?=[\s)]|$)')
+
+def chiudi_taglio(pezzo, minimo=60):
+    """Da un testo interrotto a meta' ricava un testo che finisce dove finisce
+    una frase; se non ce n'e' una abbastanza lunga, dove finisce una parola."""
+    confini = list(CONFINE_FRASE.finditer(pezzo))
+    if confini and confini[-1].start() >= minimo:
+        t = pezzo[:confini[-1].start() + 1].rstrip()
+        return t[:-1] + '.' if t.endswith(';') else t
+    spazio = pezzo.rstrip().rfind(' ')
+    if spazio < minimo:
+        return pezzo.rstrip()
+    return pezzo[:spazio].rstrip(' ,;:(\u00ab"\'') + '\u2026'
+
+def taglia(t, limite, minimo=60):
+    """Taglia a `limite` caratteri senza spezzare una parola a meta'."""
+    if len(t) <= limite:
+        return t
+    return chiudi_taglio(t[:limite], minimo)
 
 def pulisci(t, lemma=None):
     t = RE_FILE.sub(' ', t)
@@ -40,8 +70,16 @@ def pulisci(t, lemma=None):
     t = RE_HTML.sub(' ', t)                    # tag emersi dopo la decodifica
     t = RE_WLINK2.sub(r'\1', t)                # link emersi dopo la decodifica
     t = RE_WLINK1.sub(r'\1', t)
+    t = RE_ELINK.sub(r'\1', t)
     t = t.replace('[[', '').replace(']]', '').replace('{{', '').replace('}}', '')
-    return RE_SPAZI.sub(' ', t).strip(' ;:,')
+    # le quadre rimaste sono sempre residuo di markup o glossa editoriale del
+    # Wikizionario ("dicendo [alcune] cose"): il testo si legge meglio senza
+    t = t.replace('[', '').replace(']', '')
+    t = RE_SPAZI.sub(' ', t)
+    # togliere markup lascia spazi appesi davanti alla punteggiatura
+    # ("dalle conifere ]]." diventava "dalle conifere .")
+    t = re.sub(r'\s+([.,;:!?])', r'\1', t)
+    return t.strip(' ;:,')
 
 # ---------- categorie grammaticali ----------
 POS = {'sost': 'nome', 'nome': 'nome', 'agg': 'aggettivo', 'verb': 'verbo', 'avv': 'avverbio'}
@@ -190,15 +228,16 @@ def main(dump, uscita):
 
                 etim = RE_ETIM.search(sez)
                 etim = pulisci(etim.group(1).split('\n')[0], titolo) if etim else ''
+                etim = taglia(etim, 180, minimo=40)
 
                 voci.append({
                     'id': titolo, 'lemma': titolo, 'pos': pos, 'sill': sill,
-                    'def': defs[0][:260], 'defs': defs[:3],
-                    'es': esempi[0][:200] if esempi else '',
+                    'def': taglia(defs[0], 260), 'defs': defs[:3],
+                    'es': taglia(esempi[0], 200) if esempi else '',
                     'sin': sinonimi(sez),
                     'dom': list(dict.fromkeys(domini)),
                     'reg': list(dict.fromkeys(registri)),
-                    'etim': etim[:180],
+                    'etim': etim,
                 })
 
     print('pagine lette:', letti, file=sys.stderr)
