@@ -5,9 +5,10 @@
   "private": true,
   "license": "SEE LICENSE IN FONTI.md",
   "scripts": {
-    "test": "node test/prova.js && node test/dati.js",
+    "test": "node test/prova.js && node test/dati.js && node test/documenti.js",
     "test:logica": "node test/prova.js",
     "test:dati": "node test/dati.js",
+    "test:documenti": "node test/documenti.js",
     "test:e2e": "node test/e2e.js",
     "lint": "eslint .",
     "servi": "http-server -p 8777 .",

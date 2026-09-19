@@ -71,10 +71,11 @@ Readda.Srs = (function () {
    *   70%  lessico generale, che non appartiene a nessun dominio
    *    8%  tutto il resto, perche' incontrare l'imprevisto e' il punto
    *
-   * Lo strato generale vale 3.419 voci: a queste quote si esaurisce in circa
-   * undici mesi d'uso quotidiano, mentre gli altri basterebbero per anni.
-   * Quando accade, la ridistribuzione qui sotto riempie il vuoto dagli altri
-   * strati: il flusso non si ferma, si sbilancia verso i domini.
+   * Lo strato generale vale 8.660 voci. Simulando l'uso quotidiano a queste
+   * quote scende sotto il 55% dopo circa due anni, mentre gli altri
+   * basterebbero molto piu' a lungo. Quando si assottiglia, la
+   * ridistribuzione qui sotto riempie il vuoto dagli altri strati: il flusso
+   * non si ferma, si sbilancia verso i domini.
    */
   var QUOTE = { tema: 0.22, generale: 0.70, altro: 0.08 };
 
@@ -85,8 +86,10 @@ Readda.Srs = (function () {
    * restano, e continuano a valere per lo strato dei temi: una parola puo'
    * essere insieme generale e in tema con chi legge.
    * Restano specialistici solo i mestieri veri: medicina, diritto, tecnologia,
-   * scienza, lavoro. Cosi' lo strato generale passa da 3.419 a oltre 9.000
-   * voci, mentre abbassare i filtri non lo portava oltre 4.500. */
+   * scienza, lavoro. Cosi' lo strato generale passa da 3.419 a 8.660 voci,
+   * mentre abbassare i filtri non lo portava oltre 4.500.
+   * Nota sui nomi: qui il dominio si chiama "politica", ma l'interfaccia lo
+   * mostra come "Societa'" (vedi NOMI_DOMINIO in js/ui.js). */
   var LARGHI = ['generale', 'emozioni', 'tempo', 'lingua', 'pensiero',
                 'natura', 'storia', 'politica', 'scuola', 'arte', 'cucina'];
 

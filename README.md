@@ -50,7 +50,7 @@ In locale basta un server statico qualsiasi, perché il service worker e il mani
 da `file://`:
 
 ```bash
-npx http-server -p 8777 .      # poi apri http://127.0.0.1:8777
+npm run servi                  # poi apri http://127.0.0.1:8777
 ```
 
 Non c'è niente da compilare e non ci sono dipendenze a runtime: HTML, CSS e JavaScript
@@ -75,9 +75,22 @@ La pipeline sta tutta in `strumenti/`:
 | File | Cosa fa |
 |---|---|
 | `aggiorna.py` | Orchestra il ciclo e riporta le differenze |
-| `estrai.py` | Dal dump alle voci grezze: markup via, campi fuori |
+| `estrai.py` | Dal dump alle voci grezze: markup via, campi fuori, tagli sul confine di frase |
 | `costruisci.py` | Filtri, livelli, domini, tipografia, scrittura dei blocchi |
+| `flessione.py` | Le famiglie irregolari, gemella di `derivate()` in `js/srs.js` |
+| `ripara.py` | Riallinea i blocchi già pubblicati a quello che la pipeline produce oggi |
 | `curati.js` | Le 134 voci scritte a mano, che vincono sugli omonimi automatici |
+
+`ripara.py` esiste perché la pipeline è stata corretta più volte senza che i
+dati venissero rigenerati, e `data/` ha continuato a portare difetti che
+`estrai.py` non commetteva più. Rigenerare tutto dal dump non è la risposta:
+un milione di pagine riscritte cambierebbe migliaia di voci in un colpo, e
+nessuna prova saprebbe dire se il risultato è migliore.
+
+```bash
+python3 strumenti/ripara.py --controlla   # dice cosa cambierebbe, non tocca niente
+python3 strumenti/ripara.py               # applica e riscrive i blocchi
+```
 
 Per aggiungere lemmi propri basta scriverli in `curati.js` e rieseguire: hanno
 sempre la precedenza sulla versione automatica.
@@ -85,14 +98,25 @@ sempre la precedenza sulla versione automatica.
 ## Le prove
 
 ```bash
-node test/prova.js                                  # logica: corpus, SRS, account, flessione
-NODE_PATH=$(npm root -g) node test/e2e.js           # interfaccia vera in Chromium + schermate
-node test/icone.js                                  # rigenera le icone PWA
+npm test                                            # logica, dati del corpus, documenti
+NODE_PATH=$(npm root -g) npm run test:e2e           # interfaccia vera in Chromium + schermate
+npm run lint                                        # richiede eslint nel PATH, o via npx
+npm run icone                                       # rigenera le icone PWA
 ```
 
-`test/e2e.js` vuole un server attivo sulla porta 8777 e Chromium; scrive le schermate
-in `scatti/`. Le due suite insieme fanno **142 asserzioni** e hanno trovato quattordici
-difetti veri, tutti corretti:
+Le quattro suite, in ordine di quanto sono lente:
+
+| Suite | Cosa guarda |
+|---|---|
+| `test/prova.js` | La logica: corpus, SRS, account, flessione, igiene del sorgente |
+| `test/dati.js` | I 64 blocchi pubblicati: testo, campi, hash, coerenza col manifesto |
+| `test/documenti.js` | Che i numeri scritti qui siano quelli di `data/manifesto.js` |
+| `test/e2e.js` | L'app vera in Chromium, con le schermate |
+
+`test/e2e.js` vuole un server attivo sulla porta 8777 (`npm run servi`) e
+Chromium; scrive le schermate in `scatti/`.
+
+Le suite hanno trovato, finora, questi difetti veri:
 
 | Difetto | Perché contava |
 |---|---|
@@ -106,14 +130,25 @@ difetti veri, tutti corretti:
 | Il campo `forme` non veniva esportato nei blocchi | I participi irregolari tornavano a essere rifiutati, in silenzio |
 | `radice_lemma` tagliava i suffissi da una lista, e la lista aveva un buco | Mancava `-ico`, quindi «ironico: incline all'ironia» passava il filtro anticircolare |
 | 116 esempi non contenevano la parola che dovevano illustrare | Sulla carta compariva una frase che non c'entrava nulla col lemma |
-| 5 definizioni con markup wiki sopravvissuto (`attaccate]].`) | Parentesi spaiate emerse dopo la decodifica delle entità HTML |
+| 5 definizioni con markup wiki sopravvissuto (`attaccate]].`) | Corretto in pipeline e **non nei dati**, che sono rimasti rotti fino alla riparazione descritta sotto |
 | Le note legali erano rese al 16% di opacità | Un'attribuzione CC BY-SA illeggibile non soddisfa la licenza |
 | Gli interessi funzionavano da filtro invece che da inclinazione | Un mese d'uso dava al profilo «medico» 450 parole mediche e zero lessico generale |
 | Dentro ogni strato la coda ordinava per peso invece di estrarre | Lo stesso difetto un livello più in basso: 18.000 estrazioni senza mai pescare un lemma di peso 1 |
+| **Il controllo delle frasi rifiutava i verbi irregolari** | «Gli hanno imposto il silenzio» respinto con «Manca la parola»: 2.572 verbi, e il campo `forme` ne copriva 5 |
+| **112 definizioni e 17 esempi tagliati a metà parola** | Il taglio a 260 caratteri, più il punto aggiunto dopo, travestiva il monco da frase intera |
+| **I blocchi pubblicati non erano stati rigenerati** | 5 definizioni con markup wiki e 13 con parentesi spaiate: la correzione stava nel codice, i dati no |
+| **Il campo `curato` non arrivava mai al client** | La nota CC BY-SA compariva anche sotto le 134 definizioni scritte a mano |
+| «denaro» scritto con tre lettere cirilliche in `costruisci.py` | L'alternativa non corrispondeva a niente: 75 voci che parlano di denaro, 31 finite nel dominio sbagliato |
+| Un backup malformato lanciava un `TypeError` | Schermata bianca invece di «codice non valido», sull'unica rete di sicurezza di un'app senza server |
+| La striscia si azzerava al cambio dell'ora legale | «Ieri» calcolato togliendo 24 ore: il giorno dopo il passaggio ne torna indietro due |
+| La dose giornaliera non fermava niente | Un'impostazione che non fa niente insegna che le impostazioni non contano |
+| La scelta multipla poteva avere due risposte identiche | 38 definizioni stanno su due voci: escludere il solo identificatore non bastava |
+| Nessuno stile di fuoco da tastiera fuori dai campi | L'app si guida con 1, 2 e 3, e non si vedeva dove si era |
 
-Gli ultimi tre erano latenti: nessuno rompeva l'app quel giorno, tutti l'avrebbero rotta
-alla prima modifica. `test/prova.js` ora contiene le guardie che li impediscono di
-tornare.
+Tre dei primi erano latenti: nessuno rompeva l'app quel giorno, tutti
+l'avrebbero rotta alla prima modifica. Quelli in grassetto invece si vedevano,
+e sono rimasti visibili a lungo perché **nessuna prova guardava i dati
+pubblicati**: `test/dati.js` esiste per quello.
 
 ---
 
@@ -127,7 +162,7 @@ data/blocco-NN.js        64 blocchi da ~52 KB, assegnati per hash del lemma
 strumenti/               la pipeline che genera il corpus
 js/corpus.js             caricamento dei blocchi su richiesta
 js/store.js              stato e persistenza su localStorage, per nickname
-js/srs.js                Leitner a 6 caselle, coda del flusso, confronto per radice
+js/srs.js                Leitner a 6 caselle, coda del flusso, famiglie irregolari
 js/notify.js             promemoria lato client
 js/ui.js                 utilità condivise (escape, foglio modale, brindisi)
 js/views/*.js            una vista per schermata
@@ -171,7 +206,7 @@ non cambia come si parla. `blandire` e `accidia` no: quelle sono il prodotto.
 
 **Lessico esplicito.** Il Wikizionario è un dizionario completo: contiene anche
 parole volgari e voci sessualmente esplicite, e un flusso casuale può metterle
-davanti a chiunque. 33 voci (lo 0,29%) sono segnate e restano fuori dal flusso
+davanti a chiunque. 46 voci (lo 0,34%) sono segnate e restano fuori dal flusso
 finché non si accende l'interruttore in *Io*. La marcatura guarda la parola, non
 la definizione, ed esclude a mano gli omografi innocenti; i termini clinici e
 quelli neutri su identità e orientamento **non** sono segnati. Dettagli in
@@ -240,9 +275,28 @@ Per questo il **30% delle voci senza dominio non è un difetto da correggere**:
 campo, e forzarli in uno sarebbe peggio. Sono una categoria, e prendono la quota
 più grande del flusso.
 
-**Il controllo delle frasi** confronta la radice, non la forma esatta, così «ho blandito»
-vale per `blandire`. I participi irregolari non si ricavano da nessuna regola meccanica
-e stanno dichiarati nel corpus come radici alternative.
+**Il controllo delle frasi** confronta la radice, non la forma esatta, così «ho
+blandito» vale per `blandire`. Gli irregolari però dall'infinito non si
+ricavano: la radice di `imporre` è `imporr`, e «imposto» non la contiene —
+«gli hanno imposto il silenzio» veniva respinto con «Manca la parola».
+
+Dichiararli uno per uno non basta: il campo `forme` del corpus copriva 5 voci
+su 13.589, contro 2.572 verbi. Ma gli irregolari italiani sono **classi chiuse
+e produttive**: tutti i composti di *porre* si comportano come *porre*, tutti
+quelli di *durre* come *durre*. Ventotto famiglie, scritte come «fine
+dell'infinito → temi che la sostituiscono», ne coprono 336; il campo `forme`
+resta per ciò che nessuna classe descrive.
+
+Le stesse famiglie servono ai due capi della catena — nell'app per giudicare
+le frasi scritte, in pipeline per decidere se un esempio del Wikizionario
+illustra davvero il lemma — quindi esistono in due copie, `js/srs.js` e
+`strumenti/flessione.py`, e una prova le confronta su tutti i lemmi.
+
+**La dose giornaliera** ferma il flusso davvero. Raggiunte le parole nuove del
+giorno la pila si chiude e manda al ripasso, con un'uscita esplicita per chi
+vuole continuare: un muro che manda via chi ha dieci minuti liberi sarebbe
+punitivo, e un'impostazione che non fa niente insegna che le impostazioni non
+contano.
 
 ---
 
@@ -259,6 +313,11 @@ e stanno dichiarati nel corpus come radici alternative.
    licenza CC BY-SA, che è virale: chi ridistribuisce il corpus deve mantenerla.
 4. **Il controllo delle frasi verifica che la parola ci sia, non che sia usata bene.**
    Distinguere l'uso corretto dal calco goffo richiede un modello linguistico.
+   Le famiglie irregolari in `js/srs.js` coprono 336 verbi dei 2.572 del corpus:
+   dove nessuna famiglia arriva resta il campo `forme`, da scrivere a mano.
+   Dovendo sbagliare, il controllo sbaglia per eccesso — un falso accetto costa
+   poco, visto che la qualità dell'uso non la giudica comunque; un falso
+   rifiuto dice «hai sbagliato» a chi ha ragione.
 
 ## Passi successivi, in ordine di resa
 
@@ -267,3 +326,8 @@ e stanno dichiarati nel corpus come radici alternative.
    di più: ogni voce riscritta esce dal vincolo CC BY-SA.
 3. Valutazione automatica delle frasi scritte: da «contiene la parola» a «la usa bene».
 4. Sincronizzazione legata al codice di ripristino, se si accetta un server.
+5. Rieseguire `aggiorna.py` sul dump più recente. Recupererebbe gli esempi che
+   le versioni precedenti scartavano per via delle forme irregolari, e
+   riassegnerebbe il dominio `lavoro` alle voci che l'avevano perso per il
+   difetto cirillico. Non l'ho fatto qui: cambia migliaia di voci in un colpo
+   solo, e va guardato quando c'è tempo per guardarlo.
