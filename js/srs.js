@@ -48,36 +48,73 @@ Readda.Srs = (function () {
     return a;
   }
 
-  /* Coda del flusso: pesa i lemmi su interessi, lavoro e livello dichiarato,
-   * escludendo quelli già giudicati. */
+  /* Coda del flusso.
+   *
+   * Gli interessi dichiarati sono un'inclinazione, non un filtro. Pesando e
+   * ordinando soltanto, un profilo "medico" riceveva 450 parole mediche in un
+   * mese e zero lessico generale: "scevro", "prevaricare", "zotico" non
+   * arrivavano mai, pur essendo esattamente le parole per cui esiste l'app.
+   *
+   * Quindi ogni infornata si compone per strati, con quote fisse:
+   *   40%  i temi di chi legge (lavoro e interessi)
+   *   45%  lessico generale, che non appartiene a nessun dominio
+   *   15%  tutto il resto, perche' incontrare l'imprevisto e' il punto
+   */
+  var QUOTE = { tema: 0.40, generale: 0.45, altro: 0.15 };
+
   function coda(profilo, parole, quante, esplicito) {
     var interessi = profilo.interessi || [];
     var lavoro = profilo.lavoro;
     var tetto = ({ base: 1, medio: 2, alto: 3 })[profilo.obiettivo] || 3;
+    quante = quante || 40;
 
-    var candidati = Readda.Corpus.disponibili().filter(function (l) {
+    var strati = { tema: [], generale: [], altro: [] };
+
+    Readda.Corpus.disponibili().forEach(function (l) {
       var p = parole[l.id];
-      if (p && p.stato === 'attiva') return false;
-      if (p && p.stato) return false;          // già giudicato: vive nel ripasso
-      // le voci segnate come esplicite restano nel corpus ma fuori dal flusso,
-      // finche' non si accende l'interruttore in Io
-      if (l.sens && !esplicito) return false;
-      return l.lvl <= tetto + 1;
-    });
+      if (p && p.stato) return;                 // gia' giudicato: vive nel ripasso
+      if (l.sens && !esplicito) return;         // esplicito: fuori dal flusso
+      if (l.lvl > tetto + 1) return;
 
-    var pesati = candidati.map(function (l) {
+      var suo = l.dom.some(function (d) { return d === lavoro || interessi.indexOf(d) >= 0; });
+      var generico = l.dom.length === 1 && l.dom[0] === 'generale';
+      var strato = suo ? 'tema' : (generico ? 'generale' : 'altro');
+
+      // dentro lo strato conta la vicinanza al livello scelto, piu' un po' di
+      // rumore: due aperture di seguito non devono dare lo stesso ordine
       var peso = 1;
-      l.dom.forEach(function (d) {
-        if (interessi.indexOf(d) >= 0) peso += 2.2;
-        if (d === lavoro) peso += 3;
-      });
-      if (l.lvl === tetto) peso += 1.1;        // la zona di crescita è al confine
+      if (l.lvl === tetto) peso += 1.1;
       if (l.lvl > tetto) peso *= 0.45;
-      return { l: l, peso: peso * (0.55 + Math.random()) };
+      if (l.es) peso += 0.5;                    // una carta con esempio vale di piu'
+
+      // Chiave di Efraimidis-Spirakis: estrazione pesata senza rimpiazzo.
+      // Ordinare per peso lo rifarebbe un filtro, com'e' gia' successo un
+      // livello piu' su: con migliaia di candidati, chi ha peso 1 non entra
+      // mai fra i primi se centinaia hanno peso 2,6. Cosi' invece un peso
+      // doppio da' il doppio delle probabilita', non la certezza.
+      strati[strato].push({ l: l, chiave: Math.pow(Math.random(), 1 / peso) });
     });
 
-    pesati.sort(function (a, b) { return b.peso - a.peso; });
-    return pesati.slice(0, quante || 40).map(function (x) { return x.l; });
+    var nomi = ['tema', 'generale', 'altro'];
+    var perChiave = function (a, b) { return b.chiave - a.chiave; };
+    nomi.forEach(function (n) { strati[n].sort(perChiave); });
+
+    // si prende la quota da ogni strato; cio' che uno strato non riesce a
+    // dare lo ridistribuiscono gli altri, cosi' la coda resta piena
+    var presi = [], mancanti = 0;
+    nomi.forEach(function (n) {
+      var voluti = Math.round(quante * QUOTE[n]);
+      var dati = strati[n].splice(0, voluti);
+      mancanti += voluti - dati.length;
+      presi = presi.concat(dati);
+    });
+    if (mancanti > 0) {
+      var avanzi = strati.tema.concat(strati.generale, strati.altro);
+      avanzi.sort(perChiave);
+      presi = presi.concat(avanzi.slice(0, mancanti));
+    }
+
+    return mescola(presi).map(function (x) { return x.l; });
   }
 
   /* Verifica che una frase contenga davvero la parola, tollerando la flessione.

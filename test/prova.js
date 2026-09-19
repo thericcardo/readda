@@ -53,8 +53,41 @@ S.aggiornaProfilo({ lavoro: 'scuola', interessi: ['lingua', 'pensiero'], obietti
 const coda = R.coda(S.profilo(), S.tutteLeParole(), 20);
 ok('la coda restituisce lemmi', coda.length === 20);
 ok('nessun duplicato in coda', new Set(coda.map(x => x.id)).size === coda.length);
-const quotaTema = coda.filter(x => x.dom.includes('lingua') || x.dom.includes('pensiero') || x.dom.includes('scuola')).length;
-ok('gli interessi pesano davvero (>40% della coda)', quotaTema / coda.length > 0.4, (quotaTema / coda.length).toFixed(2));
+
+// Gli interessi sono un'inclinazione, non un filtro. Prima pesavano e basta,
+// e un profilo "medico" riceveva 450 parole mediche in un mese e zero lessico
+// generale: "scevro" e "prevaricare" non arrivavano mai.
+const prof = { lavoro: 'medicina', interessi: ['medicina', 'scienza'], obiettivo: 'alto' };
+const mix = { tema: 0, generale: 0, altro: 0 };
+const storia = {};
+for (let g = 0; g < 30; g++) {
+  for (const x of R.coda(prof, storia, 15, false)) {
+    storia[x.id] = { stato: 'attiva' };
+    const suo = x.dom.some(d => d === prof.lavoro || prof.interessi.includes(d));
+    mix[suo ? 'tema' : (x.dom[0] === 'generale' ? 'generale' : 'altro')]++;
+  }
+}
+const totMix = mix.tema + mix.generale + mix.altro;
+ok('i temi di chi legge sono circa il 40%', Math.abs(mix.tema / totMix - 0.40) < 0.08,
+   (100 * mix.tema / totMix).toFixed(0) + '%');
+ok('il lessico generale arriva davvero, circa il 45%', Math.abs(mix.generale / totMix - 0.45) < 0.10,
+   (100 * mix.generale / totMix).toFixed(0) + '%');
+ok('resta spazio per l\'imprevisto', mix.altro / totMix > 0.05,
+   (100 * mix.altro / totMix).toFixed(0) + '%');
+
+// Ordinare per peso rifa' del peso un filtro: con migliaia di candidati chi ha
+// peso basso non entra mai fra i primi. L'estrazione dev'essere pesata, non ordinata.
+const distinte = new Set();
+for (let i = 0; i < 20; i++) R.coda(prof, {}, 60, false).forEach(x => distinte.add(x.id));
+ok('venti aperture danno code diverse, non la stessa lista', distinte.size > 600, distinte.size);
+
+const conteggio = {};
+for (let i = 0; i < 200; i++) {
+  for (const x of R.coda(prof, {}, 60, false)) conteggio[x.id] = (conteggio[x.id] || 0) + 1;
+}
+const scarse = ['scevro', 'prevaricare', 'zotico', 'supplicare', 'sussulto']
+  .filter(id => C.lemma(id)).filter(id => !conteggio[id]);
+ok('anche le parole a peso basso vengono estratte', scarse.length === 0, scarse);
 
 gruppo('Le tre azioni');
 C.assicura(['coacervo', 'blandire', 'fugace'], () => {});

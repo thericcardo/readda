@@ -85,8 +85,8 @@ node test/icone.js                                  # rigenera le icone PWA
 ```
 
 `test/e2e.js` vuole un server attivo sulla porta 8777 e Chromium; scrive le schermate
-in `scatti/`. Le due suite insieme fanno **138 asserzioni** e hanno trovato dodici difetti
-veri, tutti corretti:
+in `scatti/`. Le due suite insieme fanno **142 asserzioni** e hanno trovato quattordici
+difetti veri, tutti corretti:
 
 | Difetto | Perché contava |
 |---|---|
@@ -102,6 +102,8 @@ veri, tutti corretti:
 | 116 esempi non contenevano la parola che dovevano illustrare | Sulla carta compariva una frase che non c'entrava nulla col lemma |
 | 5 definizioni con markup wiki sopravvissuto (`attaccate]].`) | Parentesi spaiate emerse dopo la decodifica delle entità HTML |
 | Le note legali erano rese al 16% di opacità | Un'attribuzione CC BY-SA illeggibile non soddisfa la licenza |
+| Gli interessi funzionavano da filtro invece che da inclinazione | Un mese d'uso dava al profilo «medico» 450 parole mediche e zero lessico generale |
+| Dentro ogni strato la coda ordinava per peso invece di estrarre | Lo stesso difetto un livello più in basso: 18.000 estrazioni senza mai pescare un lemma di peso 1 |
 
 Gli ultimi tre erano latenti: nessuno rompeva l'app quel giorno, tutti l'avrebbero rotta
 alla prima modifica. `test/prova.js` ora contiene le guardie che li impediscono di
@@ -182,8 +184,32 @@ di 300 KB, i blocchi arrivano mentre si scorre, e - siccome il numero di blocchi
 e' fisso - **aggiungere voci non sposta mai quelle gia' pubblicate**: un
 aggiornamento fa riscaricare solo i blocchi cambiati.
 
-**La selezione del flusso** pesa ogni lemma su mestiere e interessi dichiarati e sul
-livello scelto, con un po' di rumore per non rendere l'ordine prevedibile.
+**La selezione del flusso.** Gli interessi dichiarati sono un'**inclinazione, non
+un filtro**, e la differenza è tutto il prodotto. Nella prima versione il flusso
+pesava i lemmi sugli interessi e prendeva i più pesanti: un profilo «medico»
+riceveva così 450 parole mediche in un mese e **zero** lessico generale.
+`scevro`, `prevaricare`, `zotico`, `riluttante` non arrivavano mai — cioè proprio
+le parole per cui l'app esiste.
+
+Ogni infornata si compone quindi per strati, con quote fisse:
+
+| Strato | Quota | Cos'è |
+|---|---:|---|
+| I tuoi temi | 40% | Lavoro e interessi dichiarati |
+| Lessico generale | 45% | Parole che non appartengono a nessun dominio |
+| Il resto | 15% | Perché incontrare l'imprevisto è il punto |
+
+Dentro ogni strato l'estrazione è **pesata, non ordinata** (chiave di
+Efraimidis-Spirakis). Ordinare rifarebbe del peso un filtro un livello più in
+basso: con migliaia di candidati, un lemma di peso 1 non entra mai fra i primi
+venti se centinaia hanno peso 2,6. Così invece un peso doppio dà il doppio delle
+probabilità, non la certezza. Venti aperture danno oltre 2.000 parole distinte,
+non sempre le stesse sessanta.
+
+Per questo il **30% delle voci senza dominio non è un difetto da correggere**:
+`zotico`, `varcare`, `sussulto`, `supplicare` non appartengono davvero a nessun
+campo, e forzarli in uno sarebbe peggio. Sono una categoria, e prendono la quota
+più grande del flusso.
 
 **Il controllo delle frasi** confronta la radice, non la forma esatta, così «ho blandito»
 vale per `blandire`. I participi irregolari non si ricavano da nessuna regola meccanica
