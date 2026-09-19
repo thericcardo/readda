@@ -227,6 +227,59 @@ function gruppo(n) { console.log('\n' + n); }
   await page.waitForSelector('#dose-txt');
   ok('il flusso usa la nuova dose', (await page.textContent('#dose-txt')).endsWith('/ 25'),
      await page.textContent('#dose-txt'));
+  gruppo('La dose ferma il flusso, e lascia una porta');
+  {
+    /* La dose era un ornamento: la barra arrivava al 100% e il flusso
+       continuava. Adesso si ferma. Ma un muro che manda via chi ha dieci
+       minuti liberi sarebbe punitivo, quindi c'e' un'uscita esplicita. */
+    await page.click('.tab[data-rotta="#/io"]');
+    await page.waitForSelector('[data-dose]');
+    await page.click('[data-dose="10"]');
+    await page.waitForTimeout(250);
+    await page.click('.tab[data-rotta="#/feed"]');
+    await page.waitForSelector('#dose-txt');
+
+    // si porta il conto delle parole nuove di oggi a ridosso della dose
+    const nuovePrima = await page.evaluate(() => Readda.Store.nuoveOggi());
+    ok('la dose conta le parole nuove, non i ripassi',
+       (await page.textContent('#dose-txt')) === nuovePrima + ' / 10',
+       { barra: await page.textContent('#dose-txt'), nuove: nuovePrima });
+
+    let giri = 0;
+    while (await page.locator('#carta-viva').count() && giri < 30) {
+      await page.click('[data-giudizio="attiva"]');
+      await page.waitForTimeout(340);
+      giri++;
+    }
+    ok('il flusso si ferma alla dose', await page.locator('#oltre').count() === 1);
+    ok('la barra non supera la dose', (await page.textContent('#dose-txt')) === '10 / 10',
+       await page.textContent('#dose-txt'));
+    ok('le azioni sono nascoste mentre il flusso e\' fermo',
+       await page.locator('#azioni').isHidden() ||
+       (await page.getAttribute('#azioni', 'style') || '').indexOf('display: none') >= 0);
+
+    // la pausa resta anche tornando indietro alla scheda
+    await page.click('.tab[data-rotta="#/collezione"]');
+    await page.waitForSelector('.filtri');
+    await page.click('.tab[data-rotta="#/feed"]');
+    await page.waitForSelector('#oltre');
+    ok('la pausa non si dimentica cambiando scheda', await page.locator('#oltre').count() === 1);
+
+    await page.click('#oltre');
+    await page.waitForSelector('#carta-viva');
+    ok('«Continua lo stesso» rimette una carta', await page.locator('#carta-viva').count() === 1);
+    await page.click('[data-giudizio="attiva"]');
+    await page.waitForTimeout(340);
+    ok('dopo l\'uscita esplicita il flusso non si ferma piu\' oggi',
+       await page.locator('#carta-viva').count() === 1);
+
+    // si rimette la dose alta, cosi' le prove successive trovano il flusso aperto
+    await page.click('.tab[data-rotta="#/io"]');
+    await page.waitForSelector('[data-dose]');
+    await page.click('[data-dose="40"]');
+    await page.waitForTimeout(250);
+  }
+
   await page.click('.tab[data-rotta="#/io"]');
   await page.waitForSelector('.numeri');
 

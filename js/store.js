@@ -50,7 +50,8 @@ Readda.Store = (function () {
     if (typeof p.visto !== 'number') p.visto = 0;
     if (typeof p.ok !== 'number') p.ok = 0;
     if (typeof p.ko !== 'number') p.ko = 0;
-    if (typeof p.ultimo !== 'number') p.ultimo = p.dal || 0;
+    if (typeof p.dal !== 'number') p.dal = 0;
+    if (typeof p.ultimo !== 'number') p.ultimo = p.dal;
     p.bluff = !!p.bluff;
     // senza uno stato la parola non appartiene a nessun elenco: e' rumore
     if (['ignota', 'passiva', 'attiva'].indexOf(p.stato) < 0) return null;
@@ -289,10 +290,26 @@ Readda.Store = (function () {
     return (s.ultimoGiorno === oggiISO() || s.ultimoGiorno === ieriISO()) ? s.striscia : 0;
   }
 
+  function mezzanotte() { var d = new Date(); d.setHours(0, 0, 0, 0); return d.getTime(); }
+
+  /* Tutto cio' che e' stato toccato oggi: nuove carte del flusso e ripassi
+     insieme. Serve a dire "oggi hai lavorato", non a contare la dose. */
   function fatteOggi() {
-    var n = 0, inizio = new Date(); inizio.setHours(0, 0, 0, 0);
+    var n = 0, da = mezzanotte();
     for (var id in stato.parole) {
-      if (stato.parole.hasOwnProperty(id) && stato.parole[id].ultimo >= inizio.getTime()) n++;
+      if (stato.parole.hasOwnProperty(id) && stato.parole[id].ultimo >= da) n++;
+    }
+    return n;
+  }
+
+  /* Solo le parole incontrate oggi per la prima volta. E' quello che la
+     dose promette di limitare: "quante parole nuove al giorno". Un ripasso
+     non e' una parola nuova, e contarlo faceva salire la barra senza che
+     il flusso avesse consegnato niente. */
+  function nuoveOggi() {
+    var n = 0, da = mezzanotte();
+    for (var id in stato.parole) {
+      if (stato.parole.hasOwnProperty(id) && stato.parole[id].dal >= da) n++;
     }
     return n;
   }
@@ -348,7 +365,7 @@ Readda.Store = (function () {
     parola: parola, segna: segna, registraUso: registraUso, registraProva: registraProva,
     dimentica: dimentica, perStato: perStato, contaVisti: contaVisti,
     tutteLeParole: function () { return stato.parole; },
-    strisciaViva: strisciaViva, fatteOggi: fatteOggi,
+    strisciaViva: strisciaViva, fatteOggi: fatteOggi, nuoveOggi: nuoveOggi,
     oggiISO: oggiISO, ieriISO: ieriISO,
     impostazioni: impostazioni, imposta: imposta,
     esporta: esporta, importa: importa, cancellaAccount: cancellaAccount,

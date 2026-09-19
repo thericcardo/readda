@@ -9,6 +9,17 @@ window.Readda = window.Readda || {};
 Readda.Feed = (function () {
   var U, S, coda = [], indice = 0, animando = false, scollegaTasti = null, rifornendo = false;
 
+  /* Il giorno in cui si e' scelto di andare oltre la dose. La dose e' una
+   * scelta di prodotto - poche e digerite battono molte e dimenticate - ma
+   * un muro che manda via chi ha dieci minuti liberi sarebbe punitivo:
+   * quindi il flusso si ferma, lo dice, e lascia una porta. Chi la apre non
+   * se la ritrova chiusa in faccia a ogni cambio di scheda. */
+  var doseIgnorataIl = null;
+
+  function doseRaggiunta() {
+    return S.nuoveOggi() >= S.impostazioni().dose && doseIgnorataIl !== S.oggiISO();
+  }
+
   var SOGLIA = 96;          // px oltre i quali il trascinamento vale come scelta
   var SOGLIA_SU = 110;
 
@@ -20,7 +31,7 @@ Readda.Feed = (function () {
       '<div class="feed">' +
         '<div class="feed-testa">' +
           '<span class="occhiello">Flusso</span>' +
-          '<span class="dose"><span id="dose-txt">0 / ' + S.impostazioni().dose + '</span>' +
+          '<span class="dose"><span id="dose-txt">0 / ' + U.esc(S.impostazioni().dose) + '</span>' +
             '<span class="dose-barra"><i id="dose-barra"></i></span></span>' +
         '</div>' +
         '<div class="pila" id="pila"></div>' +
@@ -41,11 +52,17 @@ Readda.Feed = (function () {
     });
     collegaTasti();
     aggiornaDose();
-    attendi();
+    // con la dose gia' raggiunta non serve nemmeno scaricare i blocchi
+    if (doseRaggiunta()) { pausa(); return; }
+    apri();
+  }
 
-    // il corpus vive in blocchi: se ne carica una manciata, non tutto
+  /* Il corpus vive in blocchi: se ne carica una manciata, non tutto. */
+  function apri() {
+    attendi();
     Readda.Corpus.allarga(4, function () {
       coda = Readda.Srs.coda(S.profilo(), S.tutteLeParole(), 120, S.impostazioni().esplicito);
+      indice = 0;
       mostra();
     });
   }
@@ -115,11 +132,42 @@ Readda.Feed = (function () {
   function mostra() {
     var pila = U.uno('#pila');
     if (!pila) return;
+    if (doseRaggiunta()) { pausa(); return; }
     rifornisci();
     if (indice >= coda.length) { finito(); return; }
     var prossima = coda[indice + 1];
     pila.innerHTML = (prossima ? cartaHtml(prossima, true) : '') + cartaHtml(coda[indice], false);
     collegaTrascinamento(U.uno('#carta-viva'));
+  }
+
+  /* Dose raggiunta: il flusso si ferma e propone il ripasso, che e' il
+   * lavoro che rende di piu' una volta che le parole nuove sono entrate. */
+  function pausa() {
+    var d = Readda.Notifiche.dovute();
+    var dose = S.impostazioni().dose;
+    U.uno('#pila').innerHTML =
+      '<div class="vuoto">' +
+        '<span class="segno">\u2713</span>' +
+        '<p>' + U.plurale(dose, 'parola nuova oggi', 'parole nuove oggi') +
+        ': la dose \u00e8 completa.<br>' +
+        (d.totale > 0
+          ? U.plurale(d.totale, 'parola aspetta', 'parole aspettano') + ' nel ripasso, ' +
+            'e consolidare rende pi\u00f9 che aggiungere.'
+          : 'Da qui in poi si aggiunge senza digerire. Domani il flusso riparte.') +
+        '</p>' +
+        (d.totale > 0 ? '<button class="btn btn-oro" id="vai-ripasso" style="margin-top:20px">Vai al ripasso</button>' : '') +
+        '<button class="btn btn-muto" id="oltre" style="margin-top:10px">Continua lo stesso</button>' +
+      '</div>';
+    U.uno('#azioni').style.display = 'none';
+    var b = U.uno('#vai-ripasso');
+    if (b) b.addEventListener('click', function () { Readda.App.vai('#/ripasso'); });
+    U.uno('#oltre').addEventListener('click', function () {
+      doseIgnorataIl = S.oggiISO();
+      U.uno('#azioni').style.display = '';
+      // se la pausa e' comparsa all'apertura, i blocchi non sono mai stati
+      // caricati e la coda e' vuota: va composta adesso
+      if (coda.length > indice) mostra(); else apri();
+    });
   }
 
   function finito() {
@@ -139,11 +187,14 @@ Readda.Feed = (function () {
     if (b) b.addEventListener('click', function () { Readda.App.vai('#/ripasso'); });
   }
 
+  /* Conta le parole nuove, non tutto cio' che si e' toccato oggi: la dose
+   * promette "quante parole nuove al giorno", e un ripasso non e' una parola
+   * nuova. Prima la barra saliva anche stando fermi nel ripasso. */
   function aggiornaDose() {
-    var fatte = S.fatteOggi(), dose = S.impostazioni().dose;
+    var nuove = S.nuoveOggi(), dose = S.impostazioni().dose;
     var t = U.uno('#dose-txt'), b = U.uno('#dose-barra');
-    if (t) t.textContent = Math.min(fatte, dose) + ' / ' + dose;
-    if (b) b.style.width = Math.min(100, (fatte / dose) * 100) + '%';
+    if (t) t.textContent = Math.min(nuove, dose) + ' / ' + dose;
+    if (b) b.style.width = Math.min(100, (nuove / dose) * 100) + '%';
   }
 
   /* ---- trascinamento ---- */
