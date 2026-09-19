@@ -29,7 +29,7 @@ N_BLOCCHI     = 64      # fisso per sempre: cosi' aggiungere voci non sposta
 INDIZI = [
  ('medicina',  r'\b(malatt|sintom|terapi|clinic|diagnos|infiammaz|cura|paziente|medic|chirurg|farmac|organism|sangue|osseo|muscol|nerv)\w*'),
  ('diritto',   r'\b(legge|legale|giuridic|norma|reato|tribunal|contratt|sentenz|process|penale|civile|obblig|diritt|illecit)\w*'),
- ('lavoro',    r'\b(azienda|impresa|mercat|economic|commerc|finanz|денa|profitt|contabil|lavorativ|professional|industrial|produz)\w*'),
+ ('lavoro',    r'\b(azienda|impresa|mercat|economic|commerc|finanz|denar|profitt|contabil|lavorativ|professional|industrial|produz)\w*'),
  ('politica',  r'\b(stato|govern|politic|elettoral|pubblic|cittadin|social|societ|popolo|nazion|istituz|amministrat)\w*'),
  ('pensiero',  r'\b(ragionament|logic|filosof|concett|astratt|pensier|conoscenz|verit|argoment|deduz|teori|mente|intellett)\w*'),
  ('lingua',    r'\b(parola|termine|linguaggi|discors|frase|scrittur|letterari|stile|grammatic|retoric|espression|verbale|poesia|poetic)\w*'),

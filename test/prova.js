@@ -178,29 +178,55 @@ gruppo('Igiene del sorgente');
 {
   const fsm = require('fs'), pth = require('path');
   const radiceProg = pth.join(__dirname, '..');
-  const file = ['js/store.js', 'js/srs.js', 'js/notify.js', 'js/ui.js', 'js/app.js',
-    'js/views/accesso.js', 'js/views/profilo.js', 'js/views/feed.js',
-    'js/views/ripasso.js', 'js/views/collezione.js', 'js/views/io.js', 'js/corpus.js'];
 
-  // Lettere cirilliche e greche identiche a occhio alle latine: dentro un
-  // identificatore JavaScript passano la sintassi e rompono ogni ricerca.
-  const INGANNEVOLI = /[\u0400-\u04FF\u0370-\u03FF]/;
-  const sporchi = [];
-  for (const f of file) {
-    const t = fsm.readFileSync(pth.join(radiceProg, f), 'utf8');
-    // via stringhe e commenti: negli identificatori non ci devono essere
-    const codice = t.replace(/'(?:\\.|[^'\\])*'|"(?:\\.|[^"\\])*"|\/\*[\s\S]*?\*\/|\/\/[^\n]*/g, ' ');
-    if (INGANNEVOLI.test(codice)) sporchi.push(f);
+  /* L'elenco dei file non si scrive a mano: si ricava dalle cartelle, cosi'
+     un file nuovo e' coperto dal giorno in cui nasce. La lista scritta a mano
+     che c'era prima conteneva solo i .js dell'app, e infatti la stessa lettera
+     cirillica che questa prova cerca e' sopravvissuta per mesi dentro
+     strumenti/costruisci.py, dove genera il corpus. */
+  function sorgenti(cartella, estensioni, dentro) {
+    const fuori = [];
+    for (const nome of fsm.readdirSync(pth.join(radiceProg, cartella), { withFileTypes: true })) {
+      const rel = cartella ? cartella + '/' + nome.name : nome.name;
+      if (nome.isDirectory()) { if (dentro) fuori.push.apply(fuori, sorgenti(rel, estensioni, dentro)); }
+      else if (estensioni.some(e => nome.name.endsWith(e))) fuori.push(rel);
+    }
+    return fuori;
   }
-  ok('nessuna lettera cirillica o greca negli identificatori', sporchi.length === 0, sporchi);
+  const file = sorgenti('js', ['.js'], true)
+    .concat(sorgenti('test', ['.js'], false))
+    .concat(sorgenti('strumenti', ['.py'], false))
+    .concat(['sw.js', 'eslint.config.mjs']);
+  ok('la scansione trova tutti i sorgenti, non una lista scritta a mano',
+     file.length >= 20 && file.indexOf('strumenti/costruisci.py') >= 0 &&
+     file.indexOf('js/views/feed.js') >= 0, file.length);
+
+  /* Cirillico e greco: in questo progetto non esiste un uso legittimo, in
+     nessuna posizione. La versione precedente toglieva stringhe e commenti
+     prima di cercare, perche' guardava solo gli identificatori - ed e'
+     esattamente per questo che non ha mai visto "denar" scritto con tre
+     lettere cirilliche (U+0434 U+0435 U+043D) dentro la regex del dominio
+     "lavoro" in strumenti/costruisci.py. Una
+     parola scritta in due alfabeti non si trova con nessuna ricerca, e
+     nessuno si accorge che il dominio non viene mai assegnato. */
+  const INGANNEVOLI = /[\u0400-\u04FF\u0370-\u03FF]/;
+  const sporchi = file.filter(f => INGANNEVOLI.test(fsm.readFileSync(pth.join(radiceProg, f), 'utf8')));
+  ok('nessuna lettera cirillica o greca in nessun sorgente', sporchi.length === 0, sporchi);
 
   // I diacritici combinanti letterali sono invisibili nell'editor: solo escape.
-  const combinantiNudi = [];
-  for (const f of file) {
+  const combinantiNudi = file.filter(f => {
     const t = fsm.readFileSync(pth.join(radiceProg, f), 'utf8');
-    if (/[\u0300-\u036f]/.test(t.replace(/[\u00C0-\u017F]/g, ''))) combinantiNudi.push(f);
-  }
+    return /[\u0300-\u036f]/.test(t.replace(/[\u00C0-\u017F]/g, ''));
+  });
   ok('nessun diacritico combinante nudo nel sorgente', combinantiNudi.length === 0, combinantiNudi);
+
+  // Forma decomposta: "Gia" + accento si vede come "Già" ma non si trova
+  // cercando "Già", perche' sono sequenze di byte diverse.
+  const decomposti = file.filter(f => {
+    const t = fsm.readFileSync(pth.join(radiceProg, f), 'utf8');
+    return t !== t.normalize('NFC');
+  });
+  ok('tutto il sorgente e\' in forma composta (NFC)', decomposti.length === 0, decomposti);
 }
 
 gruppo('Lessico esplicito');
