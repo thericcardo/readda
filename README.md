@@ -40,7 +40,13 @@ Più persone possono usare lo stesso dispositivo: gli account sono indicizzati p
 
 ## Provarla
 
-Basta un server statico qualsiasi, perché il service worker e il manifest non funzionano
+È pubblicata come artefatto privato su claude.ai: si apre dal telefono, senza
+installare niente. `strumenti/artefatto.py` rigenera la pagina da `index.html`
+(la piattaforma aggiunge da sé doctype, head e body, quindi lì va solo il
+contenuto); accanto vanno pubblicati `assets/styles.css`, `js/**`,
+`data/manifesto.js` e i 64 blocchi.
+
+In locale basta un server statico qualsiasi, perché il service worker e il manifest non funzionano
 da `file://`:
 
 ```bash

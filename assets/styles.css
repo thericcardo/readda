@@ -42,7 +42,7 @@
 }
 
 *,*::before,*::after{box-sizing:border-box}
-html,body{height:100%}
+html,body{height:100%;min-height:100%}
 body{
   margin:0;
   background:var(--fondo);
@@ -66,9 +66,12 @@ svg{width:22px;height:22px;fill:none;stroke:currentColor;stroke-width:1.6;stroke
 }
 
 /* ============ impalcatura ============ */
+/* colonna flessibile: il flusso ha altezza piena, e con height:100% da solo
+   la catena si spezzava qui, perche' .schermo aveva solo min-height */
 .schermo{
   position:relative;z-index:1;
-  min-height:100dvh;
+  min-height:100%;
+  display:flex;flex-direction:column;
   padding-bottom:calc(var(--barra-h) + var(--sicuro-b));
   max-width:560px;margin:0 auto;
 }
@@ -152,7 +155,7 @@ textarea.campo{resize:none;line-height:1.6;min-height:104px}
 
 /* ============ ACCESSO ============ */
 .accesso{
-  min-height:100dvh;display:flex;flex-direction:column;justify-content:center;
+  min-height:100%;display:flex;flex-direction:column;justify-content:center;
   padding:0 var(--gutter) 48px;max-width:420px;margin:0 auto;
 }
 .marchio{text-align:center}
@@ -232,8 +235,7 @@ textarea.campo{resize:none;line-height:1.6;min-height:104px}
    la carta si centra nello spazio che resta, non sotto i pulsanti. */
 .feed{
   display:flex;flex-direction:column;
-  height:100dvh;
-  padding-bottom:calc(var(--barra-h) + var(--sicuro-b));
+  flex:1 1 auto;min-height:0;
   overflow:hidden;
 }
 .feed-testa{
@@ -470,7 +472,7 @@ textarea.campo{resize:none;line-height:1.6;min-height:104px}
   border-radius:26px 26px 0 0;
   background:var(--carta);border-top:1px solid var(--filo);
   animation:salifoglio .42s var(--molla) both;
-  max-height:88dvh;overflow-y:auto;
+  max-height:88%;overflow-y:auto;
 }
 @keyframes salifoglio{from{transform:translateY(100%)}to{transform:none}}
 .maniglia{width:38px;height:4px;border-radius:99px;background:var(--inchiostro-4);margin:0 auto 22px}

@@ -59,6 +59,12 @@ Readda.Store = (function () {
     return { ok: true, codice: codice, nick: n };
   }
 
+  // in una finestra privata, o con i dati del sito bloccati, questi accessi
+  // lanciano: l'app deve continuare a funzionare, solo senza ricordare
+  function ricorda(chiave) { try { localStorage.setItem(CHIAVE_ATTIVO, chiave); } catch (e) {} }
+  function ricordato() { try { return localStorage.getItem(CHIAVE_ATTIVO); } catch (e) { return null; } }
+  function scorda() { try { localStorage.removeItem(CHIAVE_ATTIVO); } catch (e) {} }
+
   function entra(n) {
     n = (n || '').trim();
     var tutti = leggiTutti();
@@ -66,12 +72,12 @@ Readda.Store = (function () {
     if (!tutti[chiave]) return { ok: false, err: 'Nickname non trovato su questo dispositivo.' };
     stato = tutti[chiave];
     nick = chiave;
-    localStorage.setItem(CHIAVE_ATTIVO, chiave);
+    ricorda(chiave);
     return { ok: true };
   }
 
   function riprendiSessione() {
-    var chiave = localStorage.getItem(CHIAVE_ATTIVO);
+    var chiave = ricordato();
     if (!chiave) return false;
     var tutti = leggiTutti();
     if (!tutti[chiave]) return false;
@@ -81,7 +87,7 @@ Readda.Store = (function () {
 
   function esci() {
     stato = null; nick = null;
-    localStorage.removeItem(CHIAVE_ATTIVO);
+    scorda();
   }
 
   function elencoNick() {
@@ -240,7 +246,7 @@ Readda.Store = (function () {
     tutti[chiave] = pacco.dati;
     scriviTutti(tutti);
     stato = pacco.dati; nick = chiave;
-    localStorage.setItem(CHIAVE_ATTIVO, chiave);
+    ricorda(chiave);
     return { ok: true, nick: pacco.dati.profilo.nick };
   }
 
