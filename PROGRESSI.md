@@ -9,8 +9,9 @@ stato verificato, e cosa resta aperto.
 Corpus 13.589 voci. Nessuna prova sui dati pubblicati, nessuna sui documenti.
 
 **Adesso**
-`test/prova.js` 114 · `test/dati.js` 35 · `test/documenti.js` 15 ·
-`test/e2e.js` 84 — **248 asserzioni, tutte verdi**. `eslint .` pulito.
+`test/prova.js` 131 · `test/dati.js` 36 · `test/documenti.js` 15 ·
+`test/e2e.js` 94 — **276 asserzioni, tutte verdi**. `eslint .` pulito.
+`python3 strumenti/ripara.py --controlla` e `estrai.py --autoprova` puliti.
 
 ---
 
@@ -199,6 +200,91 @@ si chiude con Esc, si dichiara `role="dialog"`, e il fuoco torna dov'era.
 **Nota su come è andata**: anche qui la prima asserzione sul fuoco non
 provava niente (si riduceva a «il velo non c'è più»). Quella vera apre il
 foglio da tastiera e controlla che il fuoco torni sulla voce esatta.
+
+---
+
+## 15 · Difetti trovati rileggendo il proprio lavoro — `2cf787e`
+
+Una rilettura avversariale dell'intero diff ha trovato tredici cose, dieci
+delle quali reali. Le sei di comportamento, in ordine di gravità:
+
+- **I tasti restavano attivi sulla schermata di pausa** (mio, del blocco 9).
+  Uno spazio giudicava la parola successiva — mai vista, ma salvata — e
+  `preventDefault()` impediva al bottone sotto il fuoco di azionarsi: chi usa
+  la tastiera restava chiuso dentro perdendo una parola per tentativo.
+- `pausa()` e `finito()` nascondono i tre bottoni, e solo l'uscita dalla
+  pausa li rimetteva: un rifornimento tardivo mostrava una carta senza azioni.
+- I distrattori pescavano anche fra le voci esplicite, rompendo la promessa
+  dell'interruttore proprio dove non te l'aspetti. Misurate: 2 su 900.
+- Saltare una scelta multipla con meno di quattro opzioni lasciava `prox` nel
+  passato: voce scaduta per sempre, pallino sempre acceso, promemoria ogni
+  giorno su una parola che il ripasso rifiutava di mostrare.
+- `nomeDominio()` leggeva il prototipo e chiamava `charAt` su qualunque cosa.
+- `controlla()` segnava il promemoria anche quando la notifica non partiva.
+- `importa()` validava il nickname ripulito e ne salvava un altro.
+
+---
+
+## 16 · Il giro sul fuoco da tastiera — `48bf1fa`
+
+Tre difetti nel lavoro del blocco 11. La regola `:focus-visible` imponeva
+`border-radius:4px` a tutto (stessa specificità di `.btn` e `.filtro`, e
+viene dopo): la pillola della dose diventava un quadrato. Il foglio si
+dichiarava `aria-modal` senza trattenere il tab. Il fuoco tornava al punto di
+partenza mentre il velo era ancora sullo schermo, e anche quando il nodo non
+esisteva più.
+
+---
+
+## 17 · L'invariante del taglio diventa assoluta — `1ea550e`
+
+Due componenti riconoscono un troncamento vecchio dalla sola lunghezza, e la
+firma vale solo se la pipeline non può più produrla. Non era così:
+`chiudi_taglio()` aveva un ramo che restituiva il taglio grezzo, e `taglia()`
+lasciava passare un testo lungo esattamente quanto il tetto.
+
+`python3 strumenti/estrai.py --autoprova` verifica l'invariante su 18.036
+casi, e `test/dati.js` lo esegue.
+
+---
+
+## 18 · Il guscio offline e le schermate — `18f1f30`
+
+`sw.js` elenca a mano i file da mettere in cache: dimenticarsene non rompe
+niente finché c'è rete, si scopre in aereo. Due asserzioni lo confrontano con
+gli script di `index.html`.
+
+---
+
+## 19 · Il contrasto, misurato invece che stimato — `ef98885`
+
+`--inchiostro-3` era al 40%, cioè 3,0:1 sul fondo delle carte — sotto il
+4,5:1 che serve al testo normale, ed è il livello con cui sono scritte tutte
+le note piccole, attribuzione della licenza compresa. Portato a .58, il
+minimo che regge su tutti e cinque i fondi.
+
+E la riga che spiega le scorciatoie da tastiera era scritta in
+`--inchiostro-4`, che sta all'1,6:1: fra tutti i testi da rendere invisibili
+in un'app che si guida con 1, 2 e 3, la peggiore.
+
+---
+
+## Due volte ho scritto prove che non provavano niente
+
+Vale la pena scriverlo perché è il modo più facile di illudersi di aver
+verificato qualcosa.
+
+La prima sui distrattori: su 13.589 voci la gemella esce fra le prime tre una
+volta su quattromila, quindi l'asserzione passava anche con il codice
+difettoso. Rifatta su un corpus finto di cinque voci, dove la gemella esce per
+forza: col criterio vecchio fallisce 300 volte su 300.
+
+La seconda sul fuoco del foglio modale: la condizione si riduceva a «il velo
+non c'è più». Rifatta aprendo il foglio da tastiera e controllando che il
+fuoco torni sulla voce esatta.
+
+Da lì in poi ogni prova nuova è stata verificata rimettendo il difetto e
+guardandola diventare rossa. Dove non l'ho fatto, il commit non lo dice.
 
 ---
 

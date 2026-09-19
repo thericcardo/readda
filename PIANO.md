@@ -4,6 +4,33 @@ Stato di partenza misurato il 2026-09-19 su `claude/great-wright-w81zl9`.
 Base verde: `node test/prova.js` → 81 asserzioni, `node test/e2e.js` → 63. Nessuna fallita.
 Corpus pubblicato: 13.589 voci in 64 blocchi, 46 segnate `sens`, 134 curate a mano.
 
+---
+
+## Stato di questo piano
+
+Lavorazione in [PROGRESSI.md](PROGRESSI.md), un blocco per commit.
+
+| Fascia | Voci | Fatte | Note |
+|---|---|---|---|
+| 1 — il prodotto non fa quello che dichiara | 1-6 | **6 / 6** | |
+| 2 — le prove che mancano | 7-10 | **4 / 4** | |
+| 3 — la documentazione contraddice il codice | 11-15 | **4 / 5** | la 15 (`storico.json`) chiusa con una decisione, non con una modifica |
+| 4 — funzioni dichiarate e non implementate | 16-18 | **3 / 3** | |
+| 5 — interfaccia e accessibilità | 19-21 | **3 / 3** | più il contrasto e il foglio modale, scoperti strada facendo |
+| 6 — qualità dei dati | 22-24 | **2 / 3** | la 24 resta: cambiare i filtri si valida solo rieseguendo la pipeline sul dump |
+| 7 — piccoli debiti | 25-28 | **3 / 4** | la 28 (formato data) resta: valore basso, richiede una migrazione |
+
+Scoperte durante la lavorazione e chiuse: il taglio a metà parola (112
+definizioni e 17 esempi), i tasti attivi sulla schermata di pausa, i
+distrattori che pescavano lessico esplicito, il ripasso che lasciava una voce
+scaduta per sempre, `nomeDominio()` sul prototipo, il promemoria segnato anche
+quando non partiva, il nickname salvato con gli spazi, il contorno del fuoco
+che squadrava le pillole, il foglio modale senza trappola per il tab, il
+contrasto sotto la soglia, il guscio offline senza guardia.
+
+Le tre voci che restano sono spiegate in fondo a PROGRESSI.md: due valgono
+poco rispetto al rischio, una si può validare solo con il dump alla mano.
+
 L'ordine è per rapporto valore/sforzo, non per gravità. Le voci marcate
 **[misurato]** sono state riprodotte durante la ricognizione; le altre sono
 lette dal sorgente e vanno confermate in fase di lavorazione.
