@@ -34,7 +34,10 @@ Readda.Feed = (function () {
           '<span class="dose"><span id="dose-txt">0 / ' + U.esc(S.impostazioni().dose) + '</span>' +
             '<span class="dose-barra"><i id="dose-barra"></i></span></span>' +
         '</div>' +
-        '<div class="pila" id="pila"></div>' +
+        // la pila si riscrive per intero a ogni giudizio: senza una regione
+        // viva, chi usa un lettore di schermo non sa che la carta e' cambiata
+        '<div class="pila" id="pila" role="region" aria-live="polite" ' +
+             'aria-atomic="true" aria-label="Carta del flusso"></div>' +
         '<div class="azioni" id="azioni">' +
           '<button class="azione az-ignota" data-giudizio="ignota">' +
             U.icona('ignota') + '<b>Non la conosco</b><small>Salvala e insegnamela</small></button>' +
@@ -103,26 +106,33 @@ Readda.Feed = (function () {
     scollegaTasti = function () { document.removeEventListener('keydown', onTasto); };
   }
 
+  /* La carta dietro e' l'effetto pila: mostra il lemma successivo per far
+   * vedere che il flusso continua. E' decorazione, e letta ad alta voce
+   * annuncerebbe due parole quando ne e' arrivata una. I timbri sono
+   * l'anteprima del gesto di trascinamento, e la sillabazione ripete il
+   * lemma con i puntini in mezzo: nessuno dei tre va detto. */
   function cartaHtml(l, dietro) {
     var pallini = '';
     for (var i = 1; i <= 3; i++) pallini += '<i class="' + (i <= l.lvl ? 'on' : '') + '"></i>';
     return '' +
-      '<article class="carta' + (dietro ? ' dietro' : ' entra') + '"' + (dietro ? '' : ' id="carta-viva"') + '>' +
-        '<div class="timbro sx">Non la so</div>' +
-        '<div class="timbro dx">Non la uso</div>' +
-        '<div class="timbro su">La uso</div>' +
+      '<article class="carta' + (dietro ? ' dietro' : ' entra') + '"' +
+        (dietro ? ' aria-hidden="true"' : ' id="carta-viva"') + '>' +
+        '<div class="timbro sx" aria-hidden="true">Non la so</div>' +
+        '<div class="timbro dx" aria-hidden="true">Non la uso</div>' +
+        '<div class="timbro su" aria-hidden="true">La uso</div>' +
         '<div class="carta-alto">' +
           '<div class="etichette">' +
             '<span class="pill marcata">' + U.esc(U.nomeDominio(l.dom[0])) + '</span>' +
             '<span class="pill">' + U.esc(l.reg) + '</span>' +
           '</div>' +
-          '<div class="livello" title="rarità">' + pallini + '</div>' +
+          '<div class="livello" title="rarità" aria-label="' +
+            U.esc('rarità ' + l.lvl + ' su 3') + '">' + pallini + '</div>' +
         '</div>' +
         '<h2 class="lemma">' + U.esc(l.lemma) + '</h2>' +
-        '<p class="sillabe">' + U.esc(l.sill) + '</p>' +
+        '<p class="sillabe" aria-hidden="true">' + U.esc(l.sill) + '</p>' +
         '<p class="pos">' + U.esc(l.pos) + '</p>' +
         '<p class="definizione">' + U.esc(l.def) + '</p>' +
-        '<p class="esempio">' + U.esc(l.es) + '</p>' +
+        (l.es ? '<p class="esempio">' + U.esc(l.es) + '</p>' : '') +
         '<div class="sinonimi">' +
           l.sin.slice(0, 4).map(function (s) { return '<span class="sin">' + U.esc(s) + '</span>'; }).join('') +
         '</div>' +

@@ -502,6 +502,25 @@ textarea.campo{resize:none;line-height:1.6;min-height:104px}
 }
 .brindisi.su{opacity:1;transform:translate(-50%,0)}
 
+/* ============ fuoco da tastiera ============
+   L'app si guida da tastiera: 1, 2 e 3 giudicano la carta del flusso, e le
+   opzioni della scelta multipla sono bottoni. L'unico stile di fuoco pero'
+   stava su .campo, quindi chi non usa il puntatore non vedeva mai dove si
+   trovava. :focus-visible e non :focus, perche' il cerchietto deve comparire
+   a chi naviga da tastiera e non a ogni tocco sul telefono. */
+:focus-visible{
+  outline:2px solid var(--oro);
+  outline-offset:2px;
+  border-radius:4px;
+}
+.btn:focus-visible,.azione:focus-visible,.scelta:focus-visible,
+.opz:focus-visible,.voce:focus-visible,.filtro:focus-visible{
+  outline-offset:3px;
+}
+.tab:focus-visible{outline-offset:-3px;border-radius:0}
+.campo:focus-visible{outline:none;border-color:var(--oro);box-shadow:0 0 0 2px var(--oro-fioco)}
+.interruttore:focus-visible{outline-offset:4px;border-radius:99px}
+
 @media (prefers-reduced-motion:reduce){
   *,*::before,*::after{animation-duration:.01ms!important;transition-duration:.01ms!important}
 }

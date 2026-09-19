@@ -93,7 +93,7 @@ Readda.Collezione = (function () {
       '<p class="sillabe">' + U.esc(l.sill) + '</p>' +
       '<p class="pos">' + U.esc(l.pos) + '</p>' +
       '<p class="definizione">' + U.esc(l.def) + '</p>' +
-      '<p class="esempio">' + U.esc(l.es) + '</p>' +
+      (l.es ? '<p class="esempio">' + U.esc(l.es) + '</p>' : '') +
       '<div class="sinonimi">' + l.sin.map(function (s) {
         return '<span class="sin">' + U.esc(s) + '</span>';
       }).join('') + '</div>' +

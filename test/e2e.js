@@ -227,6 +227,51 @@ function gruppo(n) { console.log('\n' + n); }
   await page.waitForSelector('#dose-txt');
   ok('il flusso usa la nuova dose', (await page.textContent('#dose-txt')).endsWith('/ 25'),
      await page.textContent('#dose-txt'));
+  gruppo('Tastiera e lettori di schermo');
+  {
+    /* L'app si guida da tastiera (1, 2, 3 nel flusso) ma l'unico stile di
+       fuoco stava sul campo di testo: chi non usa il puntatore non vedeva
+       mai dove si trovava. */
+    await page.click('.tab[data-rotta="#/feed"]');
+    await page.waitForSelector('#carta-viva');
+    const conFuoco = await page.evaluate(() => {
+      const b = document.querySelector('[data-giudizio="attiva"]');
+      b.focus();
+      // :focus-visible non si attiva con .focus() da script in tutti i casi,
+      // quindi si controlla che la regola esista e si applichi al selettore
+      return [...document.styleSheets]
+        .flatMap(f => { try { return [...f.cssRules]; } catch (e) { return []; } })
+        .filter(r => r.selectorText && r.selectorText.indexOf(':focus-visible') >= 0)
+        .map(r => r.selectorText);
+    });
+    ok('esistono regole di fuoco da tastiera', conFuoco.length >= 3, conFuoco.length);
+    ok('coprono i bottoni principali',
+       conFuoco.join(' ').indexOf('.azione:focus-visible') >= 0 &&
+       conFuoco.join(' ').indexOf('.opz:focus-visible') >= 0, conFuoco);
+
+    /* La pila si riscrive a ogni giudizio: senza regione viva il contenuto
+       cambia in silenzio. E la carta dietro e' decorazione: letta ad alta
+       voce annuncerebbe due parole quando ne e' arrivata una. */
+    ok('la pila e\' una regione viva',
+       await page.getAttribute('#pila', 'aria-live') === 'polite');
+    ok('la carta dietro non viene annunciata',
+       await page.evaluate(() => {
+         const d = document.querySelector('.carta.dietro');
+         return !d || d.getAttribute('aria-hidden') === 'true';
+       }));
+    ok('i timbri del trascinamento non vengono annunciati',
+       await page.evaluate(() => [...document.querySelectorAll('.timbro')]
+         .every(t => t.getAttribute('aria-hidden') === 'true')));
+    ok('la sillabazione non viene letta lettera per lettera',
+       await page.getAttribute('#carta-viva .sillabe', 'aria-hidden') === 'true');
+    ok('la rarita\' ha un\'etichetta a parole',
+       /rarit./.test(await page.getAttribute('#carta-viva .livello', 'aria-label') || ''),
+       await page.getAttribute('#carta-viva .livello', 'aria-label'));
+    ok('nessuna carta mostra un esempio vuoto',
+       await page.evaluate(() => [...document.querySelectorAll('.carta .esempio')]
+         .every(p => p.textContent.trim().length > 0)));
+  }
+
   gruppo('La dose ferma il flusso, e lascia una porta');
   {
     /* La dose era un ornamento: la barra arrivava al 100% e il flusso
