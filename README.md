@@ -195,9 +195,20 @@ Ogni infornata si compone quindi per strati, con quote fisse:
 
 | Strato | Quota | Cos'è |
 |---|---:|---|
-| I tuoi temi | 40% | Lavoro e interessi dichiarati |
-| Lessico generale | 45% | Parole che non appartengono a nessun dominio |
-| Il resto | 15% | Perché incontrare l'imprevisto è il punto |
+| Lessico generale | 70% | Parole che non appartengono a nessun dominio |
+| I tuoi temi | 22% | Lavoro e interessi dichiarati |
+| Il resto | 8% | Perché incontrare l'imprevisto è il punto |
+
+Le quote stanno in `QUOTE`, in cima a `coda()` in `js/srs.js`: sono una scelta di
+prodotto, non un vincolo tecnico. Con il generale al 70% l'app insegna soprattutto
+a **parlare meglio**, non a essere più precisi nel proprio mestiere; alzando la
+quota dei temi si ottiene l'opposto. Le due cose tirano in direzioni contrarie.
+
+Misurato simulando l'uso quotidiano: a queste quote lo strato generale, che vale
+3.419 voci, **scende sotto il 55% dopo 309 giorni** (le altre le ha già mostrate
+tutte), e il flusso si esaurisce del tutto a **753 giorni**. Quando uno strato si
+svuota la ridistribuzione lo riempie dagli altri: il flusso non si ferma, si
+sbilancia verso i domini.
 
 Dentro ogni strato l'estrazione è **pesata, non ordinata** (chiave di
 Efraimidis-Spirakis). Ordinare rifarebbe del peso un filtro un livello più in

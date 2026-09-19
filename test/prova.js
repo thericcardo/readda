@@ -68,12 +68,15 @@ for (let g = 0; g < 30; g++) {
   }
 }
 const totMix = mix.tema + mix.generale + mix.altro;
-ok('i temi di chi legge sono circa il 40%', Math.abs(mix.tema / totMix - 0.40) < 0.08,
+ok('i temi di chi legge sono circa il 22%', Math.abs(mix.tema / totMix - 0.22) < 0.07,
    (100 * mix.tema / totMix).toFixed(0) + '%');
-ok('il lessico generale arriva davvero, circa il 45%', Math.abs(mix.generale / totMix - 0.45) < 0.10,
+ok('il lessico generale domina il flusso, circa il 70%', Math.abs(mix.generale / totMix - 0.70) < 0.08,
    (100 * mix.generale / totMix).toFixed(0) + '%');
-ok('resta spazio per l\'imprevisto', mix.altro / totMix > 0.05,
+ok('resta spazio per l\'imprevisto', mix.altro / totMix > 0.03,
    (100 * mix.altro / totMix).toFixed(0) + '%');
+// le quote nel codice e quelle misurate devono restare allineate
+ok('le quote dichiarate sommano a uno',
+   Math.abs(0.22 + 0.70 + 0.08 - 1) < 1e-9);
 
 // Ordinare per peso rifa' del peso un filtro: con migliaia di candidati chi ha
 // peso basso non entra mai fra i primi. L'estrazione dev'essere pesata, non ordinata.

@@ -56,11 +56,16 @@ Readda.Srs = (function () {
    * arrivavano mai, pur essendo esattamente le parole per cui esiste l'app.
    *
    * Quindi ogni infornata si compone per strati, con quote fisse:
-   *   40%  i temi di chi legge (lavoro e interessi)
-   *   45%  lessico generale, che non appartiene a nessun dominio
-   *   15%  tutto il resto, perche' incontrare l'imprevisto e' il punto
+   *   22%  i temi di chi legge (lavoro e interessi)
+   *   70%  lessico generale, che non appartiene a nessun dominio
+   *    8%  tutto il resto, perche' incontrare l'imprevisto e' il punto
+   *
+   * Lo strato generale vale 3.419 voci: a queste quote si esaurisce in circa
+   * undici mesi d'uso quotidiano, mentre gli altri basterebbero per anni.
+   * Quando accade, la ridistribuzione qui sotto riempie il vuoto dagli altri
+   * strati: il flusso non si ferma, si sbilancia verso i domini.
    */
-  var QUOTE = { tema: 0.40, generale: 0.45, altro: 0.15 };
+  var QUOTE = { tema: 0.22, generale: 0.70, altro: 0.08 };
 
   function coda(profilo, parole, quante, esplicito) {
     var interessi = profilo.interessi || [];
