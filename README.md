@@ -121,6 +121,21 @@ python3 strumenti/estrai.py --autoprova   # l'invariante del taglio a 260/200
 python3 strumenti/ripara.py --controlla   # i blocchi sono allineati alla pipeline?
 ```
 
+Le prove girano a ogni spinta, in `.github/workflows/prove.yml`. Tre lavori
+separati — logica, linter, interfaccia — perché falliscono per ragioni
+diverse, e vedere quale dei tre è rosso dice già metà della risposta. Le
+schermate prodotte dalla suite in Chromium restano allegate alla corsa, anche
+quando fallisce.
+
+Serviva. Le due suite più recenti esistono per impedire che i dati pubblicati
+e i documenti tornino a divergere dal codice, ma dipendevano dal fatto che
+qualcuno si ricordasse di lanciare `npm test` — che è esattamente il
+meccanismo che aveva lasciato passare i difetti che ora sorvegliano.
+
+Gli strumenti che servono solo alle prove (eslint, Playwright, il server
+statico) li installa il workflow con `--no-save`: il progetto continua a non
+dichiarare dipendenze, che è una sua caratteristica e non una dimenticanza.
+
 `test/e2e.js` vuole un server attivo sulla porta 8777 (`npm run servi`) e
 Chromium; scrive le schermate in `scatti/`.
 

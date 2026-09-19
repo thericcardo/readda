@@ -1,0 +1,94 @@
+# Readda - le prove, eseguite da qualcun altro che non sia la memoria di chi
+# scrive.
+#
+# Serve per una ragione precisa. Le due suite piu' recenti esistono per
+# impedire che i dati pubblicati e i documenti tornino a divergere dal codice,
+# ma dipendevano interamente dal fatto che qualcuno si ricordasse di lanciare
+# `npm test` - che e' esattamente il meccanismo che aveva lasciato passare i
+# difetti che quelle suite ora sorvegliano.
+#
+# Tre lavori separati e non uno: falliscono per ragioni diverse, e vedere
+# quale dei tre e' rosso dice gia' meta' della risposta.
+#
+# Il progetto non dichiara dipendenze, ed e' una sua caratteristica, non una
+# dimenticanza: gli strumenti che servono solo qui si installano con
+# `--no-save` e non entrano nel repository.
+
+name: prove
+
+on:
+  push:
+  pull_request:
+
+# una spinta nuova sullo stesso ramo annulla la corsa precedente: la risposta
+# che interessa e' sempre quella sull'ultimo commit
+concurrency:
+  group: prove-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  logica:
+    name: Logica, dati, documenti
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      # test/dati.js chiama python3 due volte: per confrontare le famiglie
+      # irregolari di js/srs.js con quelle di strumenti/flessione.py, e per
+      # verificare l'invariante del taglio in estrai.py. Se python3 mancasse,
+      # quelle asserzioni fallirebbero invece di sparire in silenzio.
+      - name: Python disponibile
+        run: python3 --version
+      - name: npm test
+        run: npm test
+
+  stile:
+    name: Linter
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Installa il linter senza aggiungerlo al progetto
+        run: npm install --no-save eslint@9
+      # lo stesso comando scritto nel README, non una sua variante
+      - name: npm run lint
+        run: npm run lint
+
+  interfaccia:
+    name: Interfaccia in Chromium
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Installa Playwright e il server statico
+        run: npm install --no-save playwright@1 http-server@14
+      - name: Scarica Chromium
+        run: npx playwright install --with-deps chromium
+      # server e prova nello stesso passo: un processo avviato in un passo
+      # precedente non e' garantito che sopravviva a quello dopo
+      - name: Servi e prova
+        run: |
+          npx http-server -p 8777 . -s &
+          for i in $(seq 1 30); do
+            curl -sf -o /dev/null http://127.0.0.1:8777/index.html && break
+            sleep 1
+          done
+          npm run test:e2e
+      # le schermate sono meta' del lavoro di questa suite: se la prova
+      # fallisce servono ancora di piu'
+      - name: Conserva le schermate
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: scatti
+          path: scatti/
+          if-no-files-found: error

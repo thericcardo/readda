@@ -109,6 +109,25 @@ ok('nessun testo supera il proprio tetto',
   }
 }
 
+/* E che i blocchi siano allineati alla pipeline non lo si sa guardando i
+   blocchi: lo sa `ripara.py`, che applica alle voci difettose le stesse
+   funzioni della pipeline e dice se qualcosa cambierebbe. Senza questa
+   chiamata, il disallineamento che ha dato il via a tutto - pipeline
+   corretta, dati fermi - potrebbe ripetersi identico. */
+{
+  const cp = require('child_process');
+  let uscita = null, codice = 0;
+  try {
+    uscita = cp.execFileSync('python3',
+      [path.join(RADICE, 'strumenti', 'ripara.py'), '--controlla'], { encoding: 'utf8' });
+  } catch (e) {
+    uscita = (e.stdout || '').toString();
+    codice = e.status === undefined ? -1 : e.status;
+  }
+  ok('i blocchi pubblicati sono allineati a quello che la pipeline produce oggi',
+     codice === 0, (uscita || '').trim().split('\n').slice(-3));
+}
+
 ok('ogni definizione comincia in maiuscola o con un segno',
    L.every(v => !/^[a-zà-ú]/.test(v.def)), campione(L.filter(v => /^[a-zà-ú]/.test(v.def))));
 ok('ogni definizione finisce con un segno di chiusura',

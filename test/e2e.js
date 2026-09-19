@@ -13,9 +13,20 @@ function ok(nome, cond, extra) {
 }
 function gruppo(n) { console.log('\n' + n); }
 
+/* Dove sta Chromium dipende da chi esegue la prova. Su questa macchina di
+ * sviluppo e' gia' scaricato in /opt; su un esecutore di integrazione se lo
+ * scarica Playwright e sa da se' dove l'ha messo. Il percorso era scritto a
+ * mano e valeva solo qui: altrove la prova non partiva nemmeno. */
+function doveSta() {
+  if (process.env.CHROME) return { executablePath: process.env.CHROME };
+  const proprio = '/opt/pw-browsers/chromium-1194/chrome-linux/chrome';
+  if (fs.existsSync(proprio)) return { executablePath: proprio };
+  return {};   // se lo trova Playwright
+}
+
 (async () => {
   fs.mkdirSync(SCATTI, { recursive: true });
-  const browser = await chromium.launch({ executablePath: process.env.CHROME || '/opt/pw-browsers/chromium-1194/chrome-linux/chrome' });
+  const browser = await chromium.launch(doveSta());
   const ctx = await browser.newContext({ viewport: { width: 390, height: 844 }, deviceScaleFactor: 2, locale: 'it-IT' });
   const page = await ctx.newPage();
 
