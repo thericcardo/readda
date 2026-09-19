@@ -51,8 +51,8 @@ ok('i livelli stanno fra 1 e 3', L.every(v => v.lvl >= 1 && v.lvl <= 3));
 ok('gli identificatori sono minuscoli e senza spazi',
    L.every(v => v.id === v.id.toLowerCase() && !/\s/.test(v.id)));
 const sillDiversa = L.filter(v =>
-  v.sill.replace(/·/g, '').normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase()
-  !== v.id.normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase());
+  v.sill.replace(/·/g, '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase()
+  !== v.id.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase());
 ok('la sillabazione ricompone il lemma', sillDiversa.length === 0,
    sillDiversa.slice(0, 5).map(v => v.id + ' / ' + v.sill));
 ok('la sillabazione porta il separatore', L.every(v => v.sill.indexOf('·') > 0));
@@ -107,6 +107,25 @@ ok('i conteggi per dominio coincidono',
    Object.keys(M.domini).filter(d => perDominio[d] !== M.domini[d])
      .map(d => d + ': dati ' + perDominio[d] + ' vs manifesto ' + M.domini[d]));
 ok('il manifesto dichiara la fonte e la licenza', /CC BY-SA/.test(M.fonte || ''), M.fonte);
+
+/* Il campo `curato` distingue le definizioni scritte per Readda da quelle
+   del Wikizionario. Se non arriva ai blocchi, l'app attribuisce a una fonte
+   esterna un testo che e' nostro: e' successo, per tutte e 134. */
+const curate = L.filter(v => v.curato);
+ok('le voci scritte a mano portano il campo curato',
+   curate.length === M.curati, { dati: curate.length, manifesto: M.curati });
+{
+  const sorgente = fs.readFileSync(path.join(RADICE, 'strumenti', 'curati.js'), 'utf8');
+  const idSorgente = new Set((sorgente.match(/\{\s*id:"([^"]+)"/g) || [])
+    .map(m => m.replace(/\{\s*id:"/, '').replace(/"$/, '')));
+  const nonSegnate = [...idSorgente].filter(id => { const v = C.lemma(id); return v && !v.curato; });
+  ok('ogni lemma di curati.js e\' segnato nei blocchi',
+     idSorgente.size > 0 && nonSegnate.length === 0,
+     { inSorgente: idSorgente.size, nonSegnate: nonSegnate.slice(0, 5) });
+  const segnateInPiu = curate.filter(v => !idSorgente.has(v.id)).map(v => v.id);
+  ok('nessuna voce automatica si spaccia per scritta a mano',
+     segnateInPiu.length === 0, segnateInPiu.slice(0, 5));
+}
 
 gruppo('I blocchi restano riproducibili');
 /* Se l'hash in Python e quello in JavaScript divergono, i lemmi smettono di

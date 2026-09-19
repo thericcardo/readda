@@ -355,8 +355,12 @@ def scrivi(voci):
         blocchi[blocco_di(v['id'])].append(v)
 
     # 'forme' porta i participi irregolari: senza, il controllo delle frasi
-    # torna a rifiutare "ho eluso" per il lemma "eludere"
-    CAMPI = ('id', 'pos', 'sill', 'def', 'es', 'sin', 'dom', 'lvl', 'reg', 'etim', 'forme', 'sens')
+    # torna a rifiutare "ho eluso" per il lemma "eludere".
+    # 'curato' dice che la voce e' scritta a mano e non viene dal Wikizionario:
+    # senza, l'app attribuisce a una fonte esterna un testo che e' nostro, e
+    # FONTI.md dichiara un campo che nei dati pubblicati non c'e'.
+    CAMPI = ('id', 'pos', 'sill', 'def', 'es', 'sin', 'dom', 'lvl', 'reg', 'etim',
+             'forme', 'sens', 'curato')
     for n, blocco in enumerate(blocchi):
         blocco.sort(key=lambda x: x['id'])
         snello = [{k: v[k] for k in CAMPI if v.get(k)} for v in blocco]

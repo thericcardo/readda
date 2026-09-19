@@ -123,6 +123,21 @@ def una_passata(v, fatte):
     return mosso
 
 
+def ripara_curato(v, curati):
+    """Rimette il campo che dice "questa voce e' scritta a mano".
+
+    `costruisci.py` non lo elencava fra i campi esportati, quindi nei 13.589
+    record pubblicati compariva zero volte: l'app mostrava la nota «dal
+    Wikizionario, CC BY-SA 3.0» anche sotto le 134 definizioni scritte per
+    questo progetto, e FONTI.md dichiarava un campo che nei dati non c'era.
+    Le voci curate si riconoscono dall'identificatore, che nei dati
+    pubblicati porta gia' la loro definizione parola per parola."""
+    if v['id'] in curati and not v.get('curato'):
+        v['curato'] = True
+        return ['curato']
+    return []
+
+
 def ripara_voce(v, passate=4):
     """Restituisce l'elenco delle riparazioni applicate, modificando v."""
     fatte = []
@@ -162,6 +177,7 @@ def main():
     ap.add_argument('--verboso', action='store_true', help='stampa ogni voce riparata')
     a = ap.parse_args()
 
+    curati = {c['id'] for c in costruisci.carica_curati(os.path.join(QUI, 'curati.js'))}
     conteggi, esempi, toccati, sospette = {}, [], 0, 0
     for n in range(costruisci.N_BLOCCHI):
         voci = leggi_blocco(n)
@@ -169,11 +185,11 @@ def main():
         for v in voci:
             prima = dict(v)
             sospette += sospetta(v)
-            for nome in ripara_voce(v):
+            for nome in ripara_voce(v) + ripara_curato(v, curati):
                 conteggi[nome] = conteggi.get(nome, 0) + 1
                 cambiato = True
                 campo = nome.split(':')[0]
-                if a.verboso or len(esempi) < 8:
+                if (a.verboso or len(esempi) < 8) and campo in ('def', 'es'):
                     esempi.append((v['id'], nome, prima.get(campo, ''), v.get(campo, '')))
         if cambiato:
             toccati += 1
