@@ -1,0 +1,17 @@
+{
+  "name": "readda",
+  "version": "1.0.0",
+  "description": "Le parole che conosci ma non usi. App statica, nessuna dipendenza a runtime.",
+  "private": true,
+  "license": "SEE LICENSE IN FONTI.md",
+  "scripts": {
+    "test": "node test/prova.js && node test/dati.js",
+    "test:logica": "node test/prova.js",
+    "test:dati": "node test/dati.js",
+    "test:e2e": "node test/e2e.js",
+    "lint": "eslint .",
+    "servi": "http-server -p 8777 .",
+    "icone": "node test/icone.js"
+  },
+  "engines": { "node": ">=18" }
+}
