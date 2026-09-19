@@ -272,6 +272,35 @@ function gruppo(n) { console.log('\n' + n); }
          .every(p => p.textContent.trim().length > 0)));
   }
 
+  gruppo('Il foglio modale si chiude anche senza dito');
+  {
+    await page.click('.tab[data-rotta="#/collezione"]');
+    await page.waitForSelector('.filtri');
+    const voci = await page.locator('.voce').count();
+    if (voci > 0) {
+      // si apre con la tastiera, cosi' il fuoco di partenza e' la voce stessa
+      await page.focus('.voce');
+      const partenza = await page.evaluate(() =>
+        document.activeElement.getAttribute('data-id'));
+      await page.keyboard.press('Enter');
+      await page.waitForSelector('.foglio');
+      ok('il foglio si dichiara modale',
+         await page.getAttribute('.foglio', 'aria-modal') === 'true');
+      ok('il fuoco entra nel foglio',
+         await page.evaluate(() => !!document.activeElement.closest('.foglio')));
+      await page.keyboard.press('Escape');
+      await page.waitForTimeout(320);
+      ok('Esc lo chiude', await page.locator('.foglio').count() === 0);
+      const ritorno = await page.evaluate(() =>
+        document.activeElement && document.activeElement.getAttribute
+          ? document.activeElement.getAttribute('data-id') : null);
+      ok('il fuoco torna esattamente sulla voce da cui era partito',
+         ritorno !== null && ritorno === partenza, { partenza: partenza, ritorno: ritorno });
+    } else {
+      ok('nessuna voce in raccolta: foglio non verificabile', true, 'saltato');
+    }
+  }
+
   gruppo('La dose ferma il flusso, e lascia una porta');
   {
     /* La dose era un ornamento: la barra arrivava al 100% e il flusso

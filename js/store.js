@@ -86,15 +86,31 @@ Readda.Store = (function () {
     return s;
   }
 
-  /* ---------- codice di ripristino ---------- */
+  /* ---------- codice di ripristino ----------
+   * Quattro gruppi di due sillabe su diciotto: circa undici miliardi di
+   * combinazioni. Il numero va bene, la sorgente no: Math.random() non e'
+   * pensato per generare segreti, e questo codice l'app lo presenta come
+   * "l'unico modo per riprenderti i tuoi dati". Costa una riga prenderlo
+   * da crypto, con Math.random() di riserva dove crypto non c'e'. */
   var SILLABE = ['bra','cor','del','fio','gua','lan','mer','nis','ora','pel','rin','sal','tor','vel','zaf','cam','dun','fal'];
+
+  function sorteggia(quanti, massimo) {
+    var fuori = [], i;
+    try {
+      if (typeof crypto !== 'undefined' && crypto.getRandomValues) {
+        var grezzi = new Uint32Array(quanti);
+        crypto.getRandomValues(grezzi);
+        for (i = 0; i < quanti; i++) fuori.push(grezzi[i] % massimo);
+        return fuori;
+      }
+    } catch (e) { /* finestre e contesti dove crypto non e' esposto */ }
+    for (i = 0; i < quanti; i++) fuori.push(Math.floor(Math.random() * massimo));
+    return fuori;
+  }
+
   function generaCodice() {
-    var p = [];
-    for (var i = 0; i < 4; i++) {
-      var s = SILLABE[Math.floor(Math.random() * SILLABE.length)] +
-              SILLABE[Math.floor(Math.random() * SILLABE.length)];
-      p.push(s);
-    }
+    var n = sorteggia(8, SILLABE.length), p = [];
+    for (var i = 0; i < 8; i += 2) p.push(SILLABE[n[i]] + SILLABE[n[i + 1]]);
     return p.join('-');
   }
 

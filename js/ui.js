@@ -47,18 +47,41 @@ Readda.Ui = (function () {
     timerBrindisi = setTimeout(function () { brindisiEl.classList.remove('su'); }, ms || 2600);
   }
 
-  /* Foglio modale che sale dal basso. onChiudi riceve il nodo. */
+  /* Foglio modale che sale dal basso. onAperto riceve il nodo e la chiusura.
+   *
+   * Si chiude toccando fuori, e anche con Esc: toccare fuori e' un gesto che
+   * esiste solo col dito o col puntatore, e senza Esc chi naviga da tastiera
+   * restava dentro il foglio senza via d'uscita. Il fuoco entra nel foglio
+   * all'apertura e torna dov'era alla chiusura, altrimenti un lettore di
+   * schermo continua a leggere la pagina sotto. */
   function foglio(contenuto, onAperto) {
+    var prima = document.activeElement;
     var velo = document.createElement('div');
     velo.className = 'velo';
-    velo.innerHTML = '<div class="foglio"><div class="maniglia"></div>' + contenuto + '</div>';
+    velo.innerHTML = '<div class="foglio" role="dialog" aria-modal="true" tabindex="-1">' +
+                     '<div class="maniglia" aria-hidden="true"></div>' + contenuto + '</div>';
     document.body.appendChild(velo);
+
+    function onTasto(e) { if (e.key === 'Escape') { e.preventDefault(); chiudi(); } }
+
+    var chiuso = false;
     function chiudi() {
+      if (chiuso) return;
+      chiuso = true;
+      document.removeEventListener('keydown', onTasto);
       velo.style.animation = 'sfuma .22s reverse both';
       setTimeout(function () { velo.remove(); }, 200);
+      if (prima && prima.focus) prima.focus();
     }
+
     velo.addEventListener('click', function (e) { if (e.target === velo) chiudi(); });
-    if (onAperto) onAperto(velo.querySelector('.foglio'), chiudi);
+    document.addEventListener('keydown', onTasto);
+
+    var dentro = velo.querySelector('.foglio');
+    var primoCampo = dentro.querySelector('input, textarea, button');
+    (primoCampo || dentro).focus();
+
+    if (onAperto) onAperto(dentro, chiudi);
     return chiudi;
   }
 
