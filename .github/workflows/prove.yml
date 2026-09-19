@@ -17,8 +17,13 @@
 name: prove
 
 on:
-  push:
   pull_request:
+  # Solo il ramo predefinito. Le spinte su ogni altro ramo le copre gia'
+  # `pull_request`, e senza questo filtro una spinta su un ramo con una
+  # richiesta aperta fa partire tutto due volte: sei corse invece di tre.
+  # Se il ramo predefinito viene rinominato, va rinominato anche qui.
+  push:
+    branches: [claude/admiring-lamport-1yk3mb]
 
 # una spinta nuova sullo stesso ramo annulla la corsa precedente: la risposta
 # che interessa e' sempre quella sull'ultimo commit

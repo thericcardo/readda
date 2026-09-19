@@ -9,9 +9,9 @@ stato verificato, e cosa resta aperto.
 Corpus 13.589 voci. Nessuna prova sui dati pubblicati, nessuna sui documenti.
 
 **Adesso**
-`test/prova.js` 131 · `test/dati.js` 36 · `test/documenti.js` 15 ·
-`test/e2e.js` 94 — **276 asserzioni, tutte verdi**. `eslint .` pulito.
-`python3 strumenti/ripara.py --controlla` e `estrai.py --autoprova` puliti.
+`test/prova.js` 131 · `test/dati.js` 37 · `test/documenti.js` 15 ·
+`test/e2e.js` 94 — **277 asserzioni, tutte verdi**, eseguite a ogni spinta da
+`.github/workflows/prove.yml`. `eslint .` pulito.
 
 ---
 
@@ -266,6 +266,37 @@ minimo che regge su tutti e cinque i fondi.
 E la riga che spiega le scorciatoie da tastiera era scritta in
 `--inchiostro-4`, che sta all'1,6:1: fra tutti i testi da rendere invisibili
 in un'app che si guida con 1, 2 e 3, la peggiore.
+
+---
+
+## 20 · Le prove girano da sole — `c214bb2`
+
+Tutto il lavoro dei blocchi precedenti dipendeva dal fatto che qualcuno si
+ricordasse di lanciare `npm test`, cioè esattamente il meccanismo che aveva
+lasciato passare i difetti che quelle suite ora sorvegliano. Una guardia che
+va accesa a mano non è una guardia.
+
+`.github/workflows/prove.yml`: tre lavori separati — logica, linter,
+interfaccia in Chromium — perché falliscono per ragioni diverse. Gli
+strumenti che servono solo alle prove si installano con `--no-save`, così il
+progetto continua a non dichiarare dipendenze, e i passi eseguono gli stessi
+comandi scritti nel README invece di loro varianti.
+
+Due cose che senza questo non si sarebbero viste:
+
+- `test/e2e.js` aveva il percorso di Chromium scritto a mano
+  (`/opt/pw-browsers/chromium-1194/…`), valido solo sulla macchina dove era
+  stato scritto: altrove la prova non partiva. Ora prova la variabile
+  `CHROME`, poi quel percorso se esiste, poi lascia cercare a Playwright.
+- `ripara.py --controlla` non lo chiamava nessuna prova. Diceva se i blocchi
+  pubblicati sono allineati a quello che la pipeline produce oggi — cioè
+  esattamente il disallineamento da cui è partita questa sessione — e lo
+  diceva solo a chi lo eseguiva. Ora lo chiama `test/dati.js`.
+
+**Prima corsa: sei check verdi** (logica 8 s, linter 12 s, Chromium 60 s).
+Sei e non tre perché `on: [push, pull_request]` fa partire tutto due volte su
+un ramo con una richiesta aperta: corretto subito dopo limitando `push` al
+solo ramo predefinito.
 
 ---
 
