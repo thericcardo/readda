@@ -300,7 +300,7 @@ solo ramo predefinito.
 
 ---
 
-## 21 · Ho diagnosticato un guasto che non c'era — `5c0ba2a`, corretto in `ab4a2c1`
+## 21 · Ho diagnosticato un guasto che non c'era — `5c0ba2a`, corretto in `9b7e55d`
 
 Merita di stare scritto perché è l'errore più insidioso della sessione.
 
