@@ -300,6 +300,41 @@ solo ramo predefinito.
 
 ---
 
+## 21 · Ho diagnosticato un guasto che non c'era — `5c0ba2a`, corretto in `ab4a2c1`
+
+Merita di stare scritto perché è l'errore più insidioso della sessione.
+
+Dopo aver messo in piedi l'integrazione continua, ho letto lo stato dei
+controlli con `get_check_runs` e ho visto il lavoro in Chromium fermo su
+*in progress* per sette minuti, contro i sessanta secondi della corsa
+precedente con gli stessi identici passi. Ho concluso che si fosse piantato,
+ho incolpato il processo in secondo piano che tiene aperta l'uscita del
+passo — un tranello reale e classico di GitHub Actions — e ho spinto una
+correzione dicendolo nel messaggio di commit e in un commento del workflow.
+
+**Non era mai successo niente.** Interrogando i lavori uno per uno con
+`get_workflow_job`, che restituisce anche l'elenco dei passi, il lavoro
+risultava completato con successo alle 20:49:34, sessanta secondi tondi, e
+il passo «Servi e prova» era durato trenta secondi. A essere ferma era la
+lettura: `get_check_runs` e lo stato a livello di corsa continuano a
+riportare *in progress* per minuti dopo la fine. Me ne sono accorto quando
+anche i due lavori veloci — che non hanno nessun processo in secondo piano —
+sono risultati bloccati insieme: tre blocchi simultanei con cause diverse non
+esistono.
+
+Cosa resta: le modifiche sono buone pratiche e restano, ma **preventive, non
+correttive**, e il commento nel workflow che diceva «è successo» ora dice il
+contrario. Una cosa vera l'ho trovata inseguendo il fantasma: la prima
+versione della correzione chiudeva l'involucro `npx` invece del server, che
+restava vivo — l'ho visto sondando la porta dopo l'uscita dello script.
+
+Per la prossima volta: **lo stato dei controlli va letto dai singoli lavori,
+non dal riepilogo.** Il riepilogo mente per qualche minuto, e con la postura
+«CI rossa è lavoro adesso» una bugia di qualche minuto basta a far inseguire
+un guasto inesistente.
+
+---
+
 ## Due volte ho scritto prove che non provavano niente
 
 Vale la pena scriverlo perché è il modo più facile di illudersi di aver

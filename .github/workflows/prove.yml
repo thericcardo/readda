@@ -84,17 +84,17 @@ jobs:
       # Server e prova nello stesso passo: un processo avviato in un passo
       # precedente non e' garantito che sopravviva a quello dopo.
       #
-      # Le due precauzioni intorno al server non sono superflue. Un processo
-      # in secondo piano che tiene aperta l'uscita del passo puo' far restare
-      # il passo in esecuzione anche dopo che il comando in primo piano e'
-      # finito: e' successo, un lavoro identico e' passato in sessanta secondi
-      # la prima volta e si e' piantato la seconda. Quindi l'uscita del server
-      # va altrove, e il server si chiude quando la prova finisce - comunque
+      # Le precauzioni intorno al server sono preventive, non correttive: un
+      # processo in secondo piano che tiene aperta l'uscita del passo e' un
+      # modo noto di far restare un passo appeso dopo che il comando in primo
+      # piano e' finito. Qui non e' mai successo. Quindi l'uscita del server
+      # va altrove e il server si chiude quando la prova finisce, comunque
       # finisca, perche' il codice di uscita che conta e' quello della prova.
       #
       # Il server si avvia dal binario in node_modules e non con `npx`: `$!`
       # deve essere il processo da chiudere, e con npx sarebbe l'involucro
-      # che lo lancia. Chiudere l'involucro lascia il server vivo - provato.
+      # che lo lancia. Chiudere l'involucro lascia il server vivo - questo
+      # invece e' un difetto vero, trovato sondando la porta dopo l'uscita.
       - name: Servi e prova
         run: |
           ./node_modules/.bin/http-server -p 8777 . -s > /dev/null 2>&1 &
