@@ -11,6 +11,9 @@ cosi' gli aggiornamenti aggiungono senza rimescolare quello che c'e'.
 """
 import json, os, re, sys, unicodedata, collections, argparse
 
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+import flessione
+
 QUI = os.path.dirname(os.path.abspath(__file__))
 RADICE = os.path.dirname(QUI)
 DATI = os.path.join(RADICE, 'data')
@@ -225,11 +228,18 @@ def esplicito(v):
 # ---------------------------------------- coerenza fra esempio e lemma
 def esempio_valido(es, lemma, forme):
     """Un esempio che non contiene la parola non e' un esempio: sulla carta
-    mostra una frase che non c'entra niente con il lemma."""
+    mostra una frase che non c'entra niente con il lemma.
+
+    Il troncamento da solo non basta a riconoscere la parola flessa: "Il
+    soldato ritrasse la pistola" veniva scartato da "ritrarre", e la carta
+    restava senza esempio. Le famiglie irregolari stanno in flessione.py e
+    sono le stesse che l'app usa per giudicare le frasi scritte a mano:
+    scartare qui un esempio che li' sarebbe accettato non avrebbe senso."""
     if not es: return False
     t = unicodedata.normalize('NFD', es.lower())
     t = ''.join(c for c in t if not unicodedata.combining(c))
-    radici = [radice_lemma(lemma)] + [f.lower() for f in (forme or [])]
+    radici = ([radice_lemma(lemma)] + flessione.derivate(lemma)
+              + [f.lower() for f in (forme or [])])
     return any(re.search(r'\b' + re.escape(r), t) for r in radici if len(r) >= 3)
 
 def livello(rango):

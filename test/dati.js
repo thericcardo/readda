@@ -176,6 +176,32 @@ gruppo('Il controllo delle frasi contro il corpus vero');
   ok('nessun tema derivato scende sotto i quattro caratteri',
      L.every(v => R.derivate(v.id).every(t => t.length >= 4)),
      L.filter(v => R.derivate(v.id).some(t => t.length < 4)).slice(0, 3).map(v => v.id));
+
+  /* Le famiglie esistono in due copie: js/srs.js le usa per giudicare le
+     frasi scritte da chi studia, strumenti/flessione.py per decidere se un
+     esempio del Wikizionario illustra davvero il lemma. Se divergono, la
+     pipeline scarta esempi che l'app avrebbe accettato, e nessuno se ne
+     accorge - lo stesso motivo per cui l'hash FNV ha la sua prova. */
+  const cp = require('child_process');
+  let esitoPython = null;
+  try {
+    esitoPython = cp.execFileSync('python3',
+      [path.join(RADICE, 'strumenti', 'flessione.py')],
+      { input: JSON.stringify(L.map(v => v.id)), encoding: 'utf8', maxBuffer: 64 << 20 });
+  } catch (e) {
+    console.log('  --   parita\' con flessione.py non verificata: ' + e.message.split('\n')[0]);
+  }
+  if (esitoPython !== null) {
+    const daPython = JSON.parse(esitoPython);
+    const divergenti = L.filter(v => {
+      const a = R.derivate(v.id), b = daPython[v.id] || [];
+      return a.length !== b.length || a.some((t, i) => t !== b[i]);
+    });
+    ok('js/srs.js e strumenti/flessione.py danno gli stessi temi',
+       divergenti.length === 0,
+       divergenti.slice(0, 5).map(v => v.id + ': js ' + JSON.stringify(R.derivate(v.id)) +
+                                   ' vs py ' + JSON.stringify(daPython[v.id])));
+  }
 }
 
 gruppo('Lessico esplicito');
