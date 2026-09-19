@@ -11,7 +11,7 @@
  *
  *     node test/dati.js
  */
-const { ctx, caricaCorpus } = require('./banco');
+const { ctx, carica, caricaCorpus } = require('./banco');
 const fs = require('fs');
 const path = require('path');
 
@@ -24,7 +24,9 @@ function ok(nome, cond, extra) {
 }
 function gruppo(n) { console.log('\n' + n); }
 
+carica('js/srs.js');
 const C = caricaCorpus(64);
+const R = ctx.Readda.Srs;
 const M = ctx.window.READDA_MANIFESTO;
 const L = C.disponibili();
 
@@ -151,6 +153,30 @@ for (let n = 0; n < 64; n++) {
   if (!/CC BY-SA 3\.0/.test(t)) intestazioni.push(n + ' (senza licenza)');
 }
 ok('ogni blocco dichiara numero, totale, conteggio e licenza', intestazioni.length === 0, intestazioni);
+
+gruppo('Il controllo delle frasi contro il corpus vero');
+{
+  /* Le famiglie irregolari di js/srs.js sono classi, non un elenco di
+     eccezioni: se coprissero poche decine di verbi converrebbe scriverle a
+     mano nel corpus, come faceva il campo `forme` (5 voci su 13.589). */
+  const verbi = L.filter(v => v.pos === 'verbo');
+  const coperti = verbi.filter(v => R.derivate(v.id).length);
+  ok('le famiglie coprono almeno duecento verbi', coperti.length >= 200,
+     coperti.length + ' su ' + verbi.length);
+
+  /* Un esempio che non contiene la parola che illustra e' un difetto dei
+     dati, ma fino a ieri lo era anche del controllo: erano 16, e la causa
+     dei nove recuperati era che "ritrasse" non contiene "ritrarr". I
+     rimanenti sono errori di battitura nella fonte. */
+  const conEsempio = L.filter(v => v.es);
+  const incoerenti = conEsempio.filter(v => !R.contiene(v.es, v.lemma));
+  ok('al massimo otto esempi non contengono il proprio lemma',
+     incoerenti.length <= 8, incoerenti.map(v => v.id));
+
+  ok('nessun tema derivato scende sotto i quattro caratteri',
+     L.every(v => R.derivate(v.id).every(t => t.length >= 4)),
+     L.filter(v => R.derivate(v.id).some(t => t.length < 4)).slice(0, 3).map(v => v.id));
+}
 
 gruppo('Lessico esplicito');
 const segnate = L.filter(v => v.sens);

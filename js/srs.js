@@ -135,10 +135,100 @@ Readda.Srs = (function () {
   }
 
   /* Verifica che una frase contenga davvero la parola, tollerando la flessione.
-   * I verbi regolari si riconoscono dalla radice; i participi irregolari
-   * (eludere -> eluso) hanno bisogno di radici alternative dichiarate nel corpus,
-   * perche' nessuna regola meccanica li ricava dall'infinito. */
+   *
+   * Il controllo della frase e' l'unico punto in cui chi usa l'app produce
+   * qualcosa: sbagliarlo vuol dire dire "hai sbagliato" a chi ha ragione.
+   * I verbi regolari si riconoscono dalla radice ricavata dall'infinito. Gli
+   * irregolari no: "imposto" non contiene "imporr", e la frase "gli hanno
+   * imposto il silenzio" veniva respinta con "Manca la parola".
+   *
+   * Dichiararli uno per uno nel corpus non basta: il campo `forme` esiste su
+   * 5 voci delle 13.589, contro 2.572 verbi. Ma gli irregolari italiani non
+   * sono nemmeno casi isolati - sono classi chiuse e produttive. Tutti i
+   * composti di "porre" si comportano come "porre", tutti quelli di "durre"
+   * come "durre". Le famiglie qui sotto coprono quelle classi; il campo
+   * `forme` resta per i casi che nessuna classe descrive. */
   var VERBO = /(arsi|ersi|irsi|are|ere|ire)$/;
+
+  /* [fine dell'infinito, temi che la sostituiscono].
+   * Le finali piu' lunghe vengono prima: "scrivere" prima di "vere",
+   * "ndere" prima delle altre in -dere. */
+  var FAMIGLIE = [
+    ['scrivere', ['scritt', 'scriv', 'scriss']],   // descrivere -> descritto
+    ['mettere',  ['mess', 'mett', 'mis']],         // ammettere  -> ammesso, ammisi
+    ['rompere',  ['rott', 'romp', 'rupp']],        // interrompere -> interrotto
+    ['gliere',   ['lt', 'lg', 'ls', 'gli']],       // scegliere  -> scelto, scelgo
+    // "tra" da solo prenderebbe l'intero prefisso contra-: 36 lemmi del
+    // corpus, da "contraccezione" a "contrafforte". Le forme che servono
+    // davvero si scrivono per intero.
+    ['trarre',   ['tratt', 'tragg', 'trass', 'trae', 'trai', 'traev', 'traen']],
+    ['primere',  ['press', 'prim']],               // esprimere  -> espresso
+    ['iedere',   ['iest', 'ied']],                 // richiedere -> richiesto
+    ['cedere',   ['cess', 'ced']],                 // concedere  -> concesso
+    ['vedere',   ['vist', 'ved', 'vid']],          // prevedere  -> previsto
+    ['sedere',   ['sed', 'sied']],                 // possedere  -> possiede
+    ['tenere',   ['ten', 'tien', 'tenn']],         // ottenere   -> ottiene
+    ['venire',   ['ven', 'vien', 'venn']],         // provenire  -> proviene
+    ['uscire',   ['usc', 'esc']],                  // riuscire   -> riesce
+    ['scere',    ['sciut', 'sc']],                 // conoscere  -> conosciuto
+    ['ndere',    ['s', 'nd']],                     // difendere  -> difeso
+    ['udere',    ['us', 'ud']],                    // eludere    -> eluso
+    ['idere',    ['is', 'id']],                    // decidere   -> deciso
+    ['adere',    ['as', 'ad']],                    // persuadere -> persuaso
+    ['ngere',    ['nt', 'ng']],                    // spingere   -> spinto
+    ['ncere',    ['nt', 'nc']],                    // convincere -> convinto
+    ['lgere',    ['lt', 'lg']],                    // rivolgere  -> rivolto
+    ['rgere',    ['rs', 'rg']],                    // emergere   -> emerso
+    ['ggere',    ['tt', 'gg']],                    // proteggere -> protetto
+    ['lvere',    ['lt', 'lv']],                    // risolvere  -> risolto
+    ['rrere',    ['rs', 'rr']],                    // incorrere  -> incorso
+    ['durre',    ['dott', 'duc', 'duss', 'durr']], // produrre   -> prodotto
+    ['porre',    ['pos', 'pon', 'porr']],          // imporre    -> imposto
+    ['fare',     ['fatt', 'facc', 'fec', 'f']],    // soddisfare -> soddisfatto
+    // non solo verbi: i nomi in -cia e -gia cambiano la sillaba finale al
+    // plurale ("figuraccia" -> "figuracce"), e togliere la sola vocale non
+    // basta. Stanno in fondo perche' una finale verbale vince sempre.
+    ['cia',      ['c']],
+    ['gia',      ['g']]
+  ];
+
+  /* Un tema corto corrisponde a mezza lingua: "pos" da "porre" varrebbe per
+   * "posto", "possibile", "posizione". Sotto i quattro caratteri non si usa,
+   * e quindi i verbi base ("porre", "trarre") restano affidati alla radice
+   * normale: le famiglie servono ai composti, che sono la quasi totalita'. */
+  var MIN_TEMA = 4;
+
+  /* Un riflessivo si flette come l'infinito da cui viene, e l'infinito si
+   * ricava togliendo "si" e rimettendo la finale. Due possibilita', perche'
+   * i verbi in -rre perdono una erre davanti al pronome: "esimersi" viene da
+   * "esimere", ma "opporsi" viene da "opporre" e "ritrarsi" da "ritrarre". */
+  function infiniti(lemma) {
+    var l = normalizza(lemma).trim();
+    if (l.length > 3 && l.slice(-2) === 'si') {
+      var base = l.slice(0, -2);
+      return [base + 're', base + 'e', l];
+    }
+    return [l];
+  }
+
+  function derivate(lemma) {
+    var candidati = infiniti(lemma);
+    for (var c = 0; c < candidati.length; c++) {
+      var l = candidati[c];
+      for (var i = 0; i < FAMIGLIE.length; i++) {
+        var fine = FAMIGLIE[i][0];
+        if (l.length <= fine.length || l.slice(-fine.length) !== fine) continue;
+        var base = l.slice(0, l.length - fine.length);
+        var fuori = [];
+        for (var k = 0; k < FAMIGLIE[i][1].length; k++) {
+          var tema = base + FAMIGLIE[i][1][k];
+          if (tema.length >= MIN_TEMA) fuori.push(tema);
+        }
+        if (fuori.length) return fuori;
+      }
+    }
+    return [];
+  }
 
   function radice(lemma) {
     var l = normalizza(lemma);
@@ -153,11 +243,11 @@ Readda.Srs = (function () {
 
   function radici(lemma) {
     var voce = Readda.Corpus.lemma(lemma);
-    var out = [radice(lemma)];
+    var out = [radice(lemma)].concat(derivate(lemma));
     if (voce && voce.forme) {
       voce.forme.forEach(function (f) { out.push(normalizza(f)); });
     }
-    return out;
+    return out.filter(function (r, i) { return r && out.indexOf(r) === i; });
   }
 
   function normalizza(s) {
@@ -183,6 +273,8 @@ Readda.Srs = (function () {
   return {
     intervallo: intervallo, scadenze: scadenze, distrattori: distrattori,
     generale: generale, larghi: function () { return LARGHI.slice(); },
-    coda: coda, contiene: contiene, radice: radice, radici: radici, mescola: mescola
+    coda: coda, contiene: contiene, radice: radice, radici: radici,
+    derivate: derivate, famiglie: function () { return FAMIGLIE.slice(); },
+    mescola: mescola
   };
 })();

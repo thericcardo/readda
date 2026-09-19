@@ -268,6 +268,77 @@ gruppo('Leggibilita\' delle note obbligatorie');
      (io.match(/[^']*inchiostro-4[^']*/g) || []).slice(0, 2));
 }
 
+gruppo('Verbi irregolari nel controllo delle frasi');
+{
+  /* Il controllo della frase e' l'unico punto in cui chi usa l'app produce
+     qualcosa. Rifiutare una frase corretta e' il difetto piu' caro che
+     questo codice possa avere: dice "hai sbagliato" a chi ha ragione.
+
+     La radice ricavata dall'infinito non regge gli irregolari: "imposto"
+     non contiene "imporr". Il campo `forme` del corpus copriva 5 voci su
+     13.589, contro 2.572 verbi. */
+  const deveAccettare = [
+    ['supporre', 'Ho supposto il contrario'],
+    ['supporre', 'Suppongo che non verra\''],
+    ['imporre', 'Gli hanno imposto il silenzio'],
+    ['deporre', 'I soldati deposero i loro zaini'],
+    ['predisporre', 'I contadini predispongono i campi per la semina'],
+    ['opporsi', 'Si oppose a quanto era sbagliato'],
+    ['sottoporsi', 'Mi sono sottoposto al trattamento'],
+    ['ritrarre', 'Il soldato ritrasse la pistola'],
+    ['ritrarre', 'Il pittore ritrae il volto di sua madre'],
+    ['detrarre', 'Le tasse sono gia\' detratte'],
+    ['ridurre', 'Il costo e\' stato ridotto della meta\''],
+    ['sedurre', 'Si lascio\' sedurre dalla promessa'],
+    ['eludere', 'Ha eluso la domanda cambiando argomento'],
+    ['persuadere', 'Mi ha persuaso in cinque minuti'],
+    ['esimersi', 'Non posso esimermi dal dirle come stanno le cose'],
+    ['figuraccia', 'Inconsapevole delle continue figuracce che faceva'],
+    // i regolari devono continuare a funzionare come prima
+    ['blandire', 'Il candidato blandiva la platea'],
+    ['blandire', 'Ha blandito tutti'],
+    ['procrastinare', 'Ha procrastinato la decisione'],
+    ['acume', 'Ha analizzato il caso con raro acume']
+  ];
+  const rifiutati = deveAccettare.filter(function (c) {
+    return C.lemma(c[0]) && !R.contiene(c[1], c[0]);
+  });
+  ok('accetta le forme irregolari di ogni famiglia', rifiutati.length === 0,
+     rifiutati.map(c => c[0] + ' | ' + c[1] + ' | ' + JSON.stringify(R.radici(c[0]))));
+
+  /* Un falso accetto costa poco: l'app dichiara gia' di non saper giudicare
+     se la parola sia usata bene. Un falso rifiuto costa la fiducia. Ma i
+     temi troppo corti prendono mezza lingua, e vanno tenuti fuori: "tra"
+     ricavato da "contrarre" copriva l'intero prefisso contra-, 36 lemmi del
+     corpus da "contraccezione" a "contrafforte". */
+  const deveRifiutare = [
+    ['tedio', 'il tedesco parla piano'],
+    ['blandire', 'una cosa bianca sul tavolo'],
+    ['imporre', 'ha comprato il posto in prima fila'],
+    ['eludere', 'la luce e\' fioca'],
+    ['ridurre', 'il conduttore ha parlato a lungo'],
+    ['contrarre', 'la contraccezione e\' un tema delicato'],
+    ['estrarre', 'preferisce estraniarsi dal gruppo'],
+    ['spingere', 'il pinguino nuota veloce']
+  ];
+  const accettati = deveRifiutare.filter(function (c) {
+    return C.lemma(c[0]) && R.contiene(c[1], c[0]);
+  });
+  ok('non accetta parole che somigliano soltanto', accettati.length === 0,
+     accettati.map(c => c[0] + ' | ' + c[1] + ' | ' + JSON.stringify(R.radici(c[0]))));
+
+  ok('nessun tema derivato scende sotto i quattro caratteri',
+     L.every(x => R.derivate(x.id).every(t => t.length >= 4)),
+     L.filter(x => R.derivate(x.id).some(t => t.length < 4)).slice(0, 3).map(x => x.id));
+
+  /* Le misure sull'intero corpus - quanti verbi le famiglie coprono, quanti
+     esempi restano incoerenti - stanno in test/dati.js, che carica tutti e
+     64 i blocchi: qui ce ne sono otto, e il campione direbbe poco. */
+
+  ok('le radici non contengono doppioni',
+     L.slice(0, 500).every(x => { const r = R.radici(x.id); return new Set(r).size === r.length; }));
+}
+
 gruppo('Accenti e maiuscole nel riconoscimento');
 ok('ignora le maiuscole', R.contiene('BLANDIRE la folla', 'blandire'));
 ok('ignora gli accenti nel testo', R.contiene('La perifrasi \u00e8 gi\u00e0 una perifrasi', 'perifrasi'));
