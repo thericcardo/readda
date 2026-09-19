@@ -157,6 +157,48 @@ gruppo('Striscia di giorni');
 ok('la striscia è attiva oggi', S.strisciaViva() >= 1, S.strisciaViva());
 ok('conteggio di oggi coerente', S.fatteOggi() > 0);
 
+gruppo('La striscia attraverso il cambio dell\'ora');
+{
+  /* "Ieri" veniva calcolato togliendo 864e5 millisecondi ad adesso. Il
+     giorno del passaggio all'ora legale ne dura ventitre', quindi il giorno
+     dopo, fra mezzanotte e l'una, quel conto torna indietro di due giorni e
+     la striscia riparte da uno.
+
+     La prova non si fida dell'aritmetica delle date per sapere qual e' il
+     giorno prima: costruisce il calendario con numeri interi e una tabella
+     dei giorni del mese, poi controlla un solo invariante, che vale in
+     qualunque fuso: ieriISO() di oggi dev'essere oggiISO() del giorno prima. */
+  const giorniDelMese = (a, m) =>
+    [31, (a % 4 === 0 && a % 100 !== 0) || a % 400 === 0 ? 29 : 28,
+     31, 30, 31, 30, 31, 31, 30, 31, 30, 31][m - 1];
+
+  const calendario = [];
+  for (let a = 2024, m = 1, g = 1; calendario.length < 900; ) {
+    calendario.push([a, m, g]);
+    if (++g > giorniDelMese(a, m)) { g = 1; if (++m > 12) { m = 1; a++; } }
+  }
+
+  const VeraData = ctx.Date;
+  const rotti = [];
+  for (const ora of [0.5, 12, 23.5]) {
+    let precedente = null;
+    for (const [a, m, g] of calendario) {
+      const istante = new VeraData(a, m - 1, g, Math.floor(ora), (ora % 1) * 60);
+      ctx.Date = function (x) { return arguments.length ? new VeraData(x) : new VeraData(istante); };
+      ctx.Date.now = () => istante.getTime();
+      ctx.Date.prototype = VeraData.prototype;
+      const oggi = S.oggiISO(), ieri = S.ieriISO();
+      if (precedente !== null && ieri !== precedente) {
+        rotti.push('alle ' + ora + ': ' + oggi + ' → ieri=' + ieri + ', atteso ' + precedente);
+      }
+      precedente = oggi;
+    }
+  }
+  ctx.Date = VeraData;
+  ok('per 900 giorni di fila, "ieri" e\' sempre il giorno prima (' +
+     (process.env.TZ || 'fuso locale') + ')', rotti.length === 0, rotti.slice(0, 4));
+}
+
 gruppo('Esporta e ripristina');
 const pacco = S.esporta();
 ok('produce una stringa non vuota', typeof pacco === 'string' && pacco.length > 50);

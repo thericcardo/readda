@@ -250,16 +250,34 @@ Readda.Store = (function () {
 
   function contaVisti() { return Object.keys(stato.parole).length; }
 
-  /* ---------- striscia di giorni ---------- */
-  function oggiISO() { var d = new Date(); return d.getFullYear() + '-' + (d.getMonth() + 1) + '-' + d.getDate(); }
+  /* ---------- striscia di giorni ----------
+   *
+   * "Ieri" non si calcola togliendo ventiquattro ore all'istante di adesso.
+   * Il giorno del passaggio all'ora legale ne dura ventitre', quindi il
+   * lunedi' successivo alle 00:30 quel conto torna indietro di due giorni:
+   *   31 marzo 2025, 00:30  meno 864e5 ms  =  29 marzo, 23:30
+   * La striscia non riconosceva il giorno prima e ripartiva da uno. Due
+   * volte l'anno, a chi apre l'app dopo mezzanotte - e la striscia e' uno
+   * dei tre numeri della schermata Io.
+   *
+   * Si passa quindi per il calendario: si prende la data di oggi e le si
+   * toglie un giorno, che e' un'operazione definita qualunque cosa faccia
+   * l'orologio. */
+  function giornoDi(d) { return d.getFullYear() + '-' + (d.getMonth() + 1) + '-' + d.getDate(); }
+  function oggiISO() { return giornoDi(new Date()); }
+
+  function ieriISO() {
+    var d = new Date();
+    d.setHours(12, 0, 0, 0);   // mezzogiorno: nessun cambio d'ora lo sposta di giorno
+    d.setDate(d.getDate() - 1);
+    return giornoDi(d);
+  }
 
   function registraGiorno() {
     var g = oggiISO();
     var s = stato.stats;
     if (s.ultimoGiorno === g) return;
-    var ieri = new Date(Date.now() - 864e5);
-    var ieriISO = ieri.getFullYear() + '-' + (ieri.getMonth() + 1) + '-' + ieri.getDate();
-    s.striscia = (s.ultimoGiorno === ieriISO) ? s.striscia + 1 : 1;
+    s.striscia = (s.ultimoGiorno === ieriISO()) ? s.striscia + 1 : 1;
     s.ultimoGiorno = g;
     s.giorni.push(g);
     if (s.giorni.length > 400) s.giorni = s.giorni.slice(-400);
@@ -268,10 +286,7 @@ Readda.Store = (function () {
   function strisciaViva() {
     var s = stato.stats;
     if (!s.ultimoGiorno) return 0;
-    var g = oggiISO();
-    var ieri = new Date(Date.now() - 864e5);
-    var ieriISO = ieri.getFullYear() + '-' + (ieri.getMonth() + 1) + '-' + ieri.getDate();
-    return (s.ultimoGiorno === g || s.ultimoGiorno === ieriISO) ? s.striscia : 0;
+    return (s.ultimoGiorno === oggiISO() || s.ultimoGiorno === ieriISO()) ? s.striscia : 0;
   }
 
   function fatteOggi() {
@@ -334,6 +349,7 @@ Readda.Store = (function () {
     dimentica: dimentica, perStato: perStato, contaVisti: contaVisti,
     tutteLeParole: function () { return stato.parole; },
     strisciaViva: strisciaViva, fatteOggi: fatteOggi,
+    oggiISO: oggiISO, ieriISO: ieriISO,
     impostazioni: impostazioni, imposta: imposta,
     esporta: esporta, importa: importa, cancellaAccount: cancellaAccount,
     salva: salva,
