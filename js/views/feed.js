@@ -9,6 +9,17 @@ window.Readda = window.Readda || {};
 Readda.Feed = (function () {
   var U, S, coda = [], indice = 0, animando = false, scollegaTasti = null, rifornendo = false;
 
+  /* Il giorno in cui si e' scelto di andare oltre la dose. La dose e' una
+   * scelta di prodotto - poche e digerite battono molte e dimenticate - ma
+   * un muro che manda via chi ha dieci minuti liberi sarebbe punitivo:
+   * quindi il flusso si ferma, lo dice, e lascia una porta. Chi la apre non
+   * se la ritrova chiusa in faccia a ogni cambio di scheda. */
+  var doseIgnorataIl = null;
+
+  function doseRaggiunta() {
+    return S.nuoveOggi() >= S.impostazioni().dose && doseIgnorataIl !== S.oggiISO();
+  }
+
   var SOGLIA = 96;          // px oltre i quali il trascinamento vale come scelta
   var SOGLIA_SU = 110;
 
@@ -20,10 +31,13 @@ Readda.Feed = (function () {
       '<div class="feed">' +
         '<div class="feed-testa">' +
           '<span class="occhiello">Flusso</span>' +
-          '<span class="dose"><span id="dose-txt">0 / ' + S.impostazioni().dose + '</span>' +
+          '<span class="dose"><span id="dose-txt">0 / ' + U.esc(S.impostazioni().dose) + '</span>' +
             '<span class="dose-barra"><i id="dose-barra"></i></span></span>' +
         '</div>' +
-        '<div class="pila" id="pila"></div>' +
+        // la pila si riscrive per intero a ogni giudizio: senza una regione
+        // viva, chi usa un lettore di schermo non sa che la carta e' cambiata
+        '<div class="pila" id="pila" role="region" aria-live="polite" ' +
+             'aria-atomic="true" aria-label="Carta del flusso"></div>' +
         '<div class="azioni" id="azioni">' +
           '<button class="azione az-ignota" data-giudizio="ignota">' +
             U.icona('ignota') + '<b>Non la conosco</b><small>Salvala e insegnamela</small></button>' +
@@ -41,11 +55,17 @@ Readda.Feed = (function () {
     });
     collegaTasti();
     aggiornaDose();
-    attendi();
+    // con la dose gia' raggiunta non serve nemmeno scaricare i blocchi
+    if (doseRaggiunta()) { pausa(); return; }
+    apri();
+  }
 
-    // il corpus vive in blocchi: se ne carica una manciata, non tutto
+  /* Il corpus vive in blocchi: se ne carica una manciata, non tutto. */
+  function apri() {
+    attendi();
     Readda.Corpus.allarga(4, function () {
       coda = Readda.Srs.coda(S.profilo(), S.tutteLeParole(), 120, S.impostazioni().esplicito);
+      indice = 0;
       mostra();
     });
   }
@@ -75,9 +95,16 @@ Readda.Feed = (function () {
 
   function smonta() { if (scollegaTasti) { scollegaTasti(); scollegaTasti = null; } }
 
+  /* I tasti valgono solo quando c'e' una carta davanti. Senza questo
+   * controllo, sulla schermata di pausa (o su quella di fine flusso) uno
+   * spazio giudicava una parola mai vista - e, siccome preventDefault()
+   * partiva comunque, non azionava nemmeno il bottone su cui stava il
+   * fuoco: chi usa la tastiera restava chiuso dentro, perdendo una parola
+   * a ogni tentativo di uscire. */
   function collegaTasti() {
     function onTasto(e) {
       if (e.target && /INPUT|TEXTAREA/.test(e.target.tagName)) return;
+      if (!U.uno('#carta-viva')) return;
       if (e.key === '1') giudica('ignota');
       else if (e.key === '2') giudica('passiva');
       else if (e.key === '3' || e.key === 'ArrowUp' || e.key === ' ') { e.preventDefault(); giudica('attiva'); }
@@ -86,40 +113,87 @@ Readda.Feed = (function () {
     scollegaTasti = function () { document.removeEventListener('keydown', onTasto); };
   }
 
+  /* La carta dietro e' l'effetto pila: mostra il lemma successivo per far
+   * vedere che il flusso continua. E' decorazione, e letta ad alta voce
+   * annuncerebbe due parole quando ne e' arrivata una. I timbri sono
+   * l'anteprima del gesto di trascinamento, e la sillabazione ripete il
+   * lemma con i puntini in mezzo: nessuno dei tre va detto. */
   function cartaHtml(l, dietro) {
     var pallini = '';
     for (var i = 1; i <= 3; i++) pallini += '<i class="' + (i <= l.lvl ? 'on' : '') + '"></i>';
     return '' +
-      '<article class="carta' + (dietro ? ' dietro' : ' entra') + '"' + (dietro ? '' : ' id="carta-viva"') + '>' +
-        '<div class="timbro sx">Non la so</div>' +
-        '<div class="timbro dx">Non la uso</div>' +
-        '<div class="timbro su">La uso</div>' +
+      '<article class="carta' + (dietro ? ' dietro' : ' entra') + '"' +
+        (dietro ? ' aria-hidden="true"' : ' id="carta-viva"') + '>' +
+        '<div class="timbro sx" aria-hidden="true">Non la so</div>' +
+        '<div class="timbro dx" aria-hidden="true">Non la uso</div>' +
+        '<div class="timbro su" aria-hidden="true">La uso</div>' +
         '<div class="carta-alto">' +
           '<div class="etichette">' +
             '<span class="pill marcata">' + U.esc(U.nomeDominio(l.dom[0])) + '</span>' +
             '<span class="pill">' + U.esc(l.reg) + '</span>' +
           '</div>' +
-          '<div class="livello" title="rarità">' + pallini + '</div>' +
+          '<div class="livello" title="rarità" aria-label="' +
+            U.esc('rarità ' + l.lvl + ' su 3') + '">' + pallini + '</div>' +
         '</div>' +
         '<h2 class="lemma">' + U.esc(l.lemma) + '</h2>' +
-        '<p class="sillabe">' + U.esc(l.sill) + '</p>' +
+        '<p class="sillabe" aria-hidden="true">' + U.esc(l.sill) + '</p>' +
         '<p class="pos">' + U.esc(l.pos) + '</p>' +
         '<p class="definizione">' + U.esc(l.def) + '</p>' +
-        '<p class="esempio">' + U.esc(l.es) + '</p>' +
+        (l.es ? '<p class="esempio">' + U.esc(l.es) + '</p>' : '') +
         '<div class="sinonimi">' +
           l.sin.slice(0, 4).map(function (s) { return '<span class="sin">' + U.esc(s) + '</span>'; }).join('') +
         '</div>' +
       '</article>';
   }
 
+  function azioni(visibili) {
+    var el = U.uno('#azioni');
+    if (el) el.style.display = visibili ? '' : 'none';
+  }
+
   function mostra() {
     var pila = U.uno('#pila');
     if (!pila) return;
+    if (doseRaggiunta()) { pausa(); return; }
     rifornisci();
     if (indice >= coda.length) { finito(); return; }
     var prossima = coda[indice + 1];
     pila.innerHTML = (prossima ? cartaHtml(prossima, true) : '') + cartaHtml(coda[indice], false);
+    // pausa() e finito() le nascondono: se una carta ricompare - per esempio
+    // perche' un rifornimento e' arrivato dopo la schermata di fine - vanno
+    // rimesse, altrimenti resta una carta senza i suoi tre bottoni
+    azioni(true);
     collegaTrascinamento(U.uno('#carta-viva'));
+  }
+
+  /* Dose raggiunta: il flusso si ferma e propone il ripasso, che e' il
+   * lavoro che rende di piu' una volta che le parole nuove sono entrate. */
+  function pausa() {
+    var d = Readda.Notifiche.dovute();
+    var dose = S.impostazioni().dose;
+    U.uno('#pila').innerHTML =
+      '<div class="vuoto">' +
+        '<span class="segno">\u2713</span>' +
+        '<p>' + U.plurale(dose, 'parola nuova oggi', 'parole nuove oggi') +
+        ': la dose \u00e8 completa.<br>' +
+        (d.totale > 0
+          ? U.plurale(d.totale, 'parola aspetta', 'parole aspettano') + ' nel ripasso, ' +
+            'e consolidare rende pi\u00f9 che aggiungere.'
+          : 'Da qui in poi si aggiunge senza digerire. Domani il flusso riparte.') +
+        '</p>' +
+        (d.totale > 0 ? '<button class="btn btn-oro" id="vai-ripasso" style="margin-top:20px">Vai al ripasso</button>' : '') +
+        '<button class="btn btn-muto" id="oltre" style="margin-top:10px">Continua lo stesso</button>' +
+      '</div>';
+    azioni(false);
+    var b = U.uno('#vai-ripasso');
+    if (b) b.addEventListener('click', function () { Readda.App.vai('#/ripasso'); });
+    U.uno('#oltre').addEventListener('click', function () {
+      doseIgnorataIl = S.oggiISO();
+      azioni(true);
+      // se la pausa e' comparsa all'apertura, i blocchi non sono mai stati
+      // caricati e la coda e' vuota: va composta adesso
+      if (coda.length > indice) mostra(); else apri();
+    });
   }
 
   function finito() {
@@ -134,16 +208,19 @@ Readda.Feed = (function () {
         '</p>' +
         (d.totale > 0 ? '<button class="btn btn-oro" id="vai-ripasso" style="margin-top:20px">Vai al ripasso</button>' : '') +
       '</div>';
-    U.uno('#azioni').style.display = 'none';
+    azioni(false);
     var b = U.uno('#vai-ripasso');
     if (b) b.addEventListener('click', function () { Readda.App.vai('#/ripasso'); });
   }
 
+  /* Conta le parole nuove, non tutto cio' che si e' toccato oggi: la dose
+   * promette "quante parole nuove al giorno", e un ripasso non e' una parola
+   * nuova. Prima la barra saliva anche stando fermi nel ripasso. */
   function aggiornaDose() {
-    var fatte = S.fatteOggi(), dose = S.impostazioni().dose;
+    var nuove = S.nuoveOggi(), dose = S.impostazioni().dose;
     var t = U.uno('#dose-txt'), b = U.uno('#dose-barra');
-    if (t) t.textContent = Math.min(fatte, dose) + ' / ' + dose;
-    if (b) b.style.width = Math.min(100, (fatte / dose) * 100) + '%';
+    if (t) t.textContent = Math.min(nuove, dose) + ' / ' + dose;
+    if (b) b.style.width = Math.min(100, (nuove / dose) * 100) + '%';
   }
 
   /* ---- trascinamento ---- */

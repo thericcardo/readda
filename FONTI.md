@@ -3,14 +3,20 @@
 ## Le definizioni
 
 Le definizioni, gli esempi d'uso, la sillabazione accentata, i sinonimi e le
-etimologie di **11.192 delle 11.326 voci** provengono dal
+etimologie di **13.455 delle 13.589 voci** provengono dal
 [Wikizionario italiano](https://it.wiktionary.org), distribuito con licenza
 [Creative Commons Attribuzione - Condividi allo stesso modo 3.0](https://creativecommons.org/licenses/by-sa/3.0/deed.it)
 (CC BY-SA 3.0).
 
 Le restanti **134 voci** sono scritte a mano per questo progetto e portano il
-campo `curato`. Dove un lemma esisteva in entrambe le fonti, vince la versione
-scritta a mano.
+campo `curato` nei blocchi pubblicati. Dove un lemma esisteva in entrambe le
+fonti, vince la versione scritta a mano.
+
+Nell'app la distinzione si vede: la scheda di dettaglio attribuisce al
+Wikizionario le definizioni che ne vengono, e dice «scritta per Readda» le
+altre. Per un periodo il campo `curato` non veniva esportato nei blocchi e la
+nota CC BY-SA compariva anche sotto le 134: era sbagliato in entrambe le
+direzioni, e una prova in `test/dati.js` impedisce che si ripeta.
 
 ## Le modifiche apportate
 
@@ -27,7 +33,7 @@ Il testo del Wikizionario non è stato copiato così com'era. La pipeline in
   gergo troppo raro;
 - assegna un livello da 1 a 3 incrociando il rango di frequenza.
 
-Di 782.769 pagine lette ne sopravvivono 11.326: il 1,4%.
+Di 782.769 pagine lette ne sopravvivono 13.589: l'1,7%.
 
 ## Cosa comporta la licenza
 
@@ -51,7 +57,7 @@ Il Wikizionario è un dizionario completo, quindi contiene anche parole volgari 
 voci sessualmente esplicite. Un flusso che pesca a caso può metterle davanti a
 chiunque, anche in un'aula.
 
-**33 voci su 11.326 (lo 0,29%)** sono segnate con `sens` e restano fuori dal
+**46 voci su 13.589 (lo 0,34%)** sono segnate con `sens` e restano fuori dal
 flusso finché non si accende l'interruttore in *Io → Lessico esplicito*. Non sono
 cancellate: sono nel corpus e tornano disponibili quando si vuole.
 
@@ -81,3 +87,9 @@ python3 strumenti/aggiorna.py
 ```
 
 Scarica le fonti, riestrae, ricostruisce i blocchi e riporta cosa è cambiato.
+
+## Se i numeri di questa pagina non tornano
+
+Sono quelli di `data/manifesto.js`, che è generato. `node test/documenti.js`
+li confronta e fallisce se divergono: è successo, e per mesi questa pagina ha
+dichiarato 11.326 voci mentre il corpus ne aveva 13.589.

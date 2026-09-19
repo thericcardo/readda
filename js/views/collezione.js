@@ -93,7 +93,7 @@ Readda.Collezione = (function () {
       '<p class="sillabe">' + U.esc(l.sill) + '</p>' +
       '<p class="pos">' + U.esc(l.pos) + '</p>' +
       '<p class="definizione">' + U.esc(l.def) + '</p>' +
-      '<p class="esempio">' + U.esc(l.es) + '</p>' +
+      (l.es ? '<p class="esempio">' + U.esc(l.es) + '</p>' : '') +
       '<div class="sinonimi">' + l.sin.map(function (s) {
         return '<span class="sin">' + U.esc(s) + '</span>';
       }).join('') + '</div>' +
@@ -101,7 +101,12 @@ Readda.Collezione = (function () {
       '<p style="margin-top:22px;font-size:12.5px;color:var(--inchiostro-3)">' +
         (p.prox ? 'Prossimo ripasso ' + U.esc(U.quando(p.prox)) : 'Fuori dal ripasso') +
         ' · ' + p.ok + ' giuste, ' + p.ko + ' sbagliate</p>' +
-      (p.curato ? '' :
+      // la nota di licenza va sulla voce, non sul record dell'utente: `p` e'
+      // quello che sa quante frasi hai scritto, `l` e' quello che sa da dove
+      // viene la definizione. Le 134 voci scritte a mano non vengono dal
+      // Wikizionario e attribuirgliele e' sbagliato in entrambe le direzioni.
+      (l.curato ? '<p style="margin-top:20px;font-size:11.5px;color:var(--inchiostro-3);line-height:1.5">' +
+        'Definizione scritta per Readda.</p>' :
         '<p style="margin-top:20px;font-size:11.5px;color:var(--inchiostro-3);line-height:1.5">' +
         'Definizione dal Wikizionario italiano, CC BY-SA 3.0, con modifiche.</p>') +
       '<button class="btn btn-muto btn-pieno" id="togli" style="margin-top:18px">Toglila dalla raccolta</button>',

@@ -43,7 +43,14 @@ Readda.Io = (function () {
           '</div>' +
           '<button class="interruttore" id="sw-notifiche" role="switch" ' +
             'aria-checked="' + attive_notifiche + '" aria-label="Promemoria"></button></div>' +
+          '<div class="filtri" style="padding:14px 0 0">' +
+            [9, 13, 18, 21].map(function (h) {
+              return '<button class="filtro" data-ora="' + h + '" aria-pressed="' +
+                (S.impostazioni().oraPromemoria === h) + '">' + h + ':00</button>';
+            }).join('') +
+          '</div>' +
           '<p style="margin-top:14px;font-size:12px;color:var(--inchiostro-3);line-height:1.5">' +
+            'Uno al giorno, nelle due ore successive all’orario scelto. ' +
             'Senza un server, il browser può avvisarti solo mentre Readda è aperta o da poco chiusa. ' +
             'Vedi il README per il passo successivo.</p>' +
         '</div>' +
@@ -106,6 +113,11 @@ Readda.Io = (function () {
     );
 
     U.uno('#sw-notifiche').addEventListener('click', commutaNotifiche);
+    U.su('[data-ora]', 'click', function (e) {
+      S.imposta('oraPromemoria', parseInt(e.currentTarget.getAttribute('data-ora'), 10));
+      disegna();
+      U.brindisi('Promemoria verso le ' + S.impostazioni().oraPromemoria + ':00');
+    });
     U.su('[data-dose]', 'click', function (e) {
       S.imposta('dose', parseInt(e.currentTarget.getAttribute('data-dose'), 10));
       disegna();
