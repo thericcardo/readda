@@ -42,17 +42,29 @@ self.addEventListener('fetch', function (e) {
 
 /* Pronto per il giorno in cui ci sara' un server: i push arrivano qui. */
 self.addEventListener('push', function (e) {
-  var dati = { titolo: 'Readda', corpo: 'Hai parole in attesa.' };
+  var dati = { titolo: 'Readda', corpo: 'Hai parole in attesa.', rotta: '#/ripasso' };
   try { if (e.data) dati = Object.assign(dati, e.data.json()); } catch (err) {}
   e.waitUntil(self.registration.showNotification(dati.titolo, {
-    body: dati.corpo, icon: './assets/icona-192.png', badge: './assets/icona-192.png', tag: 'readda'
+    body: dati.corpo,
+    icon: './assets/icona-192.png',
+    badge: './assets/icona-192.png',
+    tag: 'readda',
+    data: { rotta: dati.rotta || '#/ripasso' },
+    // la domanda "l'hai usata?" si risponde scrivendo: portare dentro subito
+    actions: [{ action: 'apri', title: 'Scrivi una frase' }]
   }));
 });
 
 self.addEventListener('notificationclick', function (e) {
   e.notification.close();
-  e.waitUntil(clients.matchAll({ type: 'window' }).then(function (lista) {
-    for (var i = 0; i < lista.length; i++) if ('focus' in lista[i]) return lista[i].focus();
-    if (clients.openWindow) return clients.openWindow('./#/ripasso');
+  var rotta = (e.notification.data && e.notification.data.rotta) || '#/ripasso';
+  e.waitUntil(clients.matchAll({ type: 'window', includeUncontrolled: true }).then(function (lista) {
+    for (var i = 0; i < lista.length; i++) {
+      if ('focus' in lista[i]) {
+        if ('navigate' in lista[i]) lista[i].navigate('./' + rotta).catch(function () {});
+        return lista[i].focus();
+      }
+    }
+    if (clients.openWindow) return clients.openWindow('./' + rotta);
   }));
 });

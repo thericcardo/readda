@@ -46,7 +46,10 @@ function doveSta() {
   const errori = [];
   // le risorse esterne (Google Fonts) possono fallire dietro un proxy:
   // non e' un difetto dell'app, che ha i suoi fallback di sistema
-  const esterno = t => /ERR_CERT|ERR_NAME|ERR_INTERNET|fonts\.(googleapis|gstatic)/.test(t);
+  // Un 404 su /api/chiave non e' un difetto: e' l'app che chiede "c'e' un
+  // server dietro?" e riceve no, ripiegando sul controllo ad app aperta.
+  const esterno = t => /ERR_CERT|ERR_NAME|ERR_INTERNET|fonts\.(googleapis|gstatic)/.test(t)
+                    || (/404/.test(t) && !/blocco-|\.css|\.js\b/.test(t));
   page.on('console', m => { if (m.type() === 'error' && !esterno(m.text())) errori.push(m.text()); });
   page.on('pageerror', e => errori.push('pageerror: ' + e.message));
 

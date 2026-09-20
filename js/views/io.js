@@ -49,10 +49,8 @@ Readda.Io = (function () {
                 (S.impostazioni().oraPromemoria === h) + '">' + h + ':00</button>';
             }).join('') +
           '</div>' +
-          '<p style="margin-top:14px;font-size:12px;color:var(--inchiostro-3);line-height:1.5">' +
-            'Uno al giorno, nelle due ore successive all’orario scelto. ' +
-            'Senza un server, il browser può avvisarti solo mentre Readda è aperta o da poco chiusa. ' +
-            'Vedi il README per il passo successivo.</p>' +
+          '<p id="modo-notifiche" style="margin-top:14px;font-size:12px;color:var(--inchiostro-3);line-height:1.5">' +
+            'Uno al giorno, nelle due ore successive all’orario scelto.</p>' +
         '</div>' +
 
         '<div class="riquadro">' +
@@ -113,8 +111,10 @@ Readda.Io = (function () {
     );
 
     U.uno('#sw-notifiche').addEventListener('click', commutaNotifiche);
+    mostraModo();
     U.su('[data-ora]', 'click', function (e) {
       S.imposta('oraPromemoria', parseInt(e.currentTarget.getAttribute('data-ora'), 10));
+      Readda.Notifiche.sincronizza();
       disegna();
       U.brindisi('Promemoria verso le ' + S.impostazioni().oraPromemoria + ':00');
     });
@@ -137,28 +137,47 @@ Readda.Io = (function () {
     U.uno('#cancella').addEventListener('click', confermaCancella);
   }
 
+  /* Il canale non si sa in anticipo: dipende da come l'app e' ospitata.
+     Si chiede al server, e si dice a chi legge cosa aspettarsi davvero. */
+  function mostraModo() {
+    if (!U.uno('#modo-notifiche')) return;
+    Readda.Notifiche.cercaServer().then(function (conServer) {
+      var el = U.uno('#modo-notifiche');
+      if (!el) return;
+      el.innerHTML = conServer
+        ? 'Uno al giorno, nelle due ore successive all’orario scelto. '
+          + 'C’è un server dietro: arrivano <b>anche ad app chiusa</b>.'
+        : 'Uno al giorno, nelle due ore successive all’orario scelto. '
+          + 'Senza un server il browser può avvisarti solo mentre Readda è aperta o da '
+          + 'poco chiusa: è il limite principale, e si toglie mettendo in piedi '
+          + 'server/server.js.';
+    });
+  }
+
   function commutaNotifiche() {
     var sw = U.uno('#sw-notifiche');
     var acceso = sw.getAttribute('aria-checked') === 'true';
     if (acceso) {
-      S.imposta('notifiche', false);
       sw.setAttribute('aria-checked', 'false');
-      Readda.Notifiche.ferma();
-      U.brindisi('Promemoria spenti');
+      Readda.Notifiche.disiscrivi().then(function () { U.brindisi('Promemoria spenti'); });
       return;
     }
     if (!Readda.Notifiche.supportate()) { U.brindisi('Questo browser non li supporta'); return; }
     Readda.Notifiche.chiedi().then(function (esito) {
       if (esito !== 'granted') {
         U.brindisi('Permesso non concesso');
-        U.uno('#nota-notifiche').textContent =
-          'Il browser li ha bloccati: vanno riattivati dalle impostazioni del sito.';
+        var n = U.uno('#nota-notifiche');
+        if (n) n.textContent = 'Il browser li ha bloccati: vanno riattivati dalle impostazioni del sito.';
         return;
       }
-      S.imposta('notifiche', true);
-      sw.setAttribute('aria-checked', 'true');
-      Readda.Notifiche.avvia();
-      U.brindisi('Promemoria accesi');
+      Readda.Notifiche.iscrivi().then(function (r) {
+        sw.setAttribute('aria-checked', 'true');
+        if (r.ok) { U.brindisi('Promemoria accesi, anche ad app chiusa'); return; }
+        // niente server: si ripiega sul controllo ad app aperta, dicendolo
+        S.imposta('notifiche', true);
+        Readda.Notifiche.avvia();
+        U.brindisi('Accesi, ma solo ad app aperta');
+      });
     });
   }
 

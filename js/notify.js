@@ -9,6 +9,8 @@ window.Readda = window.Readda || {};
 Readda.Notifiche = (function () {
   var timer = null;
   var INTERVALLO = 5 * 60 * 1000;
+  var conServer = null;      // null = non ancora saputo
+  var chiaveVapid = null;
 
   function supportate() { return typeof Notification !== 'undefined'; }
   function permesso() { return supportate() ? Notification.permission : 'unsupported'; }
@@ -81,7 +83,150 @@ Readda.Notifiche = (function () {
     return scarto < FINESTRA_ORE;
   }
 
+  /* ==================================================== con un server
+   * Il Web Push ha bisogno di qualcuno che tenga le scadenze e scriva al
+   * servizio push del browser: non si programma dal solo lato client.
+   * Quando c'e' un server dietro, il controllo locale qui sotto si spegne.
+   */
+  function pushPossibile() {
+    return ('serviceWorker' in navigator) && ('PushManager' in window) &&
+           (location.protocol === 'https:' || location.hostname === 'localhost');
+  }
+
+  function api(via, metodo, corpo) {
+    return fetch(via, {
+      method: metodo || 'GET',
+      headers: corpo ? { 'Content-Type': 'application/json' } : {},
+      body: corpo ? JSON.stringify(corpo) : undefined
+    }).then(function (r) {
+      return r.json().catch(function () { return {}; })
+        .then(function (d) { return { stato: r.status, dati: d }; });
+    });
+  }
+
+  /* C'e' un server dietro? Si scopre chiedendogli la chiave, una volta sola. */
+  function cercaServer() {
+    if (conServer !== null) return Promise.resolve(conServer);
+    return api('/api/chiave').then(function (r) {
+      conServer = r.stato === 200 && !!r.dati.chiave;
+      chiaveVapid = conServer ? r.dati.chiave : null;
+      return conServer;
+    }).catch(function () { conServer = false; return false; });
+  }
+
+  function bytesDaB64u(s) {
+    var pad = '='.repeat((4 - s.length % 4) % 4);
+    var raw = atob((s + pad).replace(/-/g, '+').replace(/_/g, '/'));
+    var out = new Uint8Array(raw.length);
+    for (var i = 0; i < raw.length; i++) out[i] = raw.charCodeAt(i);
+    return out;
+  }
+  function b64uDaBuffer(buf) {
+    var b = '', v = new Uint8Array(buf);
+    for (var i = 0; i < v.length; i++) b += String.fromCharCode(v[i]);
+    return btoa(b).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+  }
+
+  /* Tutte le parole che torneranno, non solo quelle gia' mature: il server
+   * non sa nulla del corpus, quindi il lemma da chiedere viaggia con loro. */
+  function scadenzeDaMandare() {
+    var parole = Readda.Store.tutteLeParole(), fuori = [];
+    for (var id in parole) {
+      if (!parole.hasOwnProperty(id)) continue;
+      var w = parole[id];
+      if (!w.prox) continue;
+      var tipo = (w.stato === 'passiva' || w.bluff) ? 'produzione'
+               : (w.stato === 'ignota' ? 'riconoscimento' : null);
+      if (!tipo) continue;
+      fuori.push({ quando: w.prox, lemma: id, tipo: tipo });
+    }
+    fuori.sort(function (a, b) { return a.quando - b.quando; });
+    return fuori.slice(0, 500);
+  }
+
+  function fusoOrario() { return -new Date().getTimezoneOffset(); }
+
+  function iscrivi() {
+    return cercaServer().then(function (c) {
+      if (!c) return { ok: false, motivo: 'nessun server' };
+      if (!pushPossibile()) return { ok: false, motivo: 'i push non sono disponibili qui' };
+      return navigator.serviceWorker.register('sw.js')
+        .then(function (reg) { return navigator.serviceWorker.ready.then(function () { return reg; }); })
+        .then(function (reg) {
+          return reg.pushManager.getSubscription().then(function (gia) {
+            return gia || reg.pushManager.subscribe({
+              userVisibleOnly: true,
+              applicationServerKey: bytesDaB64u(chiaveVapid)
+            });
+          });
+        })
+        .then(function (sub) {
+          var j = sub.toJSON ? sub.toJSON() : {};
+          var iscr = {
+            endpoint: sub.endpoint,
+            keys: (j && j.keys) || {
+              p256dh: b64uDaBuffer(sub.getKey('p256dh')),
+              auth: b64uDaBuffer(sub.getKey('auth'))
+            }
+          };
+          return api('/api/iscrizione', 'POST', {
+            nick: Readda.Store.profilo().nick,
+            iscrizione: iscr,
+            gettone: Readda.Store.impostazioni().gettone || undefined,
+            fuso: fusoOrario(),
+            ora: Readda.Store.impostazioni().oraPromemoria,
+            scadenze: scadenzeDaMandare()
+          }).then(function (r) {
+            if (r.stato !== 200) return { ok: false, motivo: (r.dati && r.dati.errore) || 'rifiutata' };
+            Readda.Store.imposta('gettone', r.dati.gettone);
+            Readda.Store.imposta('notifiche', true);
+            return { ok: true, server: true };
+          });
+        })
+        .catch(function (e) { return { ok: false, motivo: (e && e.message) || 'iscrizione fallita' }; });
+    });
+  }
+
+  function disiscrivi() {
+    var imp = Readda.Store.impostazioni();
+    Readda.Store.imposta('notifiche', false);
+    ferma();
+    if (!conServer || !imp.gettone) return Promise.resolve();
+    return api('/api/iscrizione', 'DELETE', {
+      nick: Readda.Store.profilo().nick, gettone: imp.gettone
+    }).catch(function () {});
+  }
+
+  /* Da richiamare quando le scadenze cambiano: il server deve sapere quando
+   * tornare a chiedere, altrimenti sveglia per parole gia' fatte. */
+  var sincronizzando = false;
+  function sincronizza() {
+    if (!Readda.Store.caricato()) return Promise.resolve(false);
+    var imp = Readda.Store.impostazioni();
+    if (!imp.notifiche || !imp.gettone || sincronizzando) return Promise.resolve(false);
+    return cercaServer().then(function (c) {
+      if (!c) return false;
+      sincronizzando = true;
+      return api('/api/scadenze', 'POST', {
+        nick: Readda.Store.profilo().nick,
+        gettone: imp.gettone,
+        fuso: fusoOrario(),
+        ora: imp.oraPromemoria,
+        scadenze: scadenzeDaMandare()
+      }).then(function (r) {
+        sincronizzando = false;
+        // gettone non piu' valido: l'iscrizione va rifatta
+        if (r.stato === 403 || r.stato === 404) Readda.Store.imposta('gettone', null);
+        return r.stato === 200;
+      }).catch(function () { sincronizzando = false; return false; });
+    });
+  }
+
+  function modo() { return conServer === null ? 'ignoto' : (conServer ? 'server' : 'locale'); }
+
+  /* ================================================= senza server */
   function controlla() {
+    if (conServer) return;          // ci pensa il server, anche ad app chiusa
     if (!Readda.Store.caricato()) return;
     var imp = Readda.Store.impostazioni();
     if (!imp.notifiche) return;
@@ -96,7 +241,10 @@ Readda.Notifiche = (function () {
 
   function avvia() {
     ferma();
-    timer = setInterval(controlla, INTERVALLO);
+    cercaServer().then(function (c) {
+      if (c) { sincronizza(); return; }
+      timer = setInterval(controlla, INTERVALLO);
+    });
   }
   function ferma() { if (timer) { clearInterval(timer); timer = null; } }
 
@@ -110,6 +258,9 @@ Readda.Notifiche = (function () {
     supportate: supportate, permesso: permesso, chiedi: chiedi,
     dovute: dovute, avvia: avvia, ferma: ferma,
     aggiornaPallino: aggiornaPallino, invia: invia,
-    messaggio: messaggio, nellaFinestra: nellaFinestra, controlla: controlla
+    messaggio: messaggio, nellaFinestra: nellaFinestra, controlla: controlla,
+    cercaServer: cercaServer, pushPossibile: pushPossibile, modo: modo,
+    iscrivi: iscrivi, disiscrivi: disiscrivi, sincronizza: sincronizza,
+    scadenzeDaMandare: scadenzeDaMandare
   };
 })();

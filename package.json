@@ -1,18 +1,24 @@
 {
   "name": "readda",
   "version": "1.0.0",
-  "description": "Le parole che conosci ma non usi. App statica, nessuna dipendenza a runtime.",
+  "description": "Le parole che conosci ma non usi. App statica piu' un server di promemoria, nessuna dipendenza.",
   "private": true,
   "license": "SEE LICENSE IN FONTI.md",
   "scripts": {
-    "test": "node test/prova.js && node test/dati.js && node test/documenti.js",
+    "test": "node test/prova.js && node test/dati.js && node test/documenti.js && node server/prova-push.js && node server/prova-server.js",
     "test:logica": "node test/prova.js",
     "test:dati": "node test/dati.js",
     "test:documenti": "node test/documenti.js",
+    "test:push": "node server/prova-push.js",
+    "test:server": "node server/prova-server.js",
     "test:e2e": "node test/e2e.js",
+    "test:consegna": "node server/prova-vera.js",
     "lint": "eslint .",
     "servi": "http-server -p 8777 .",
+    "server": "node server/server.js",
     "icone": "node test/icone.js"
   },
-  "engines": { "node": ">=18" }
+  "engines": {
+    "node": ">=18"
+  }
 }

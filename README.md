@@ -95,11 +95,36 @@ python3 strumenti/ripara.py               # applica e riscrive i blocchi
 Per aggiungere lemmi propri basta scriverli in `curati.js` e rieseguire: hanno
 sempre la precedenza sulla versione automatica.
 
+## Il server
+
+```bash
+npm run server -- --porta 8080
+```
+
+Serve i file dell'app e manda i promemoria push **anche ad app chiusa** — che è
+il meccanismo per cui Readda esiste: la domanda «l'hai usata?» ha senso quando
+arriva mentre vivi, non mentre guardi l'app. Senza server l'app ripiega sul
+controllo a scheda aperta e lo dice in chiaro nella schermata *Io*, invece di
+lasciarlo credere.
+
+Nessuna dipendenza, come il resto: la cifratura RFC 8291 e la firma VAPID
+RFC 8292 sono scritte sul modulo `crypto` di Node. Nessun database: un file JSON
+scritto in modo atomico.
+
+Sa il minimo: nickname, iscrizione push del browser, scadenze con il lemma da
+chiedere, fuso orario e ora preferita. **Non** sa email, password, né le frasi
+che gli utenti scrivono. Non essendoci password, il gettone che emette alla prima
+iscrizione è l'unica cosa che impedisce a chi indovini un nickname di dirottarne
+i promemoria.
+
+Messa in esercizio, rotte e regole in [server/LEGGIMI.md](server/LEGGIMI.md).
+
 ## Le prove
 
 ```bash
-npm test                                            # logica, dati del corpus, documenti
+npm test                                            # logica, dati, documenti, cifratura, server
 NODE_PATH=$(npm root -g) npm run test:e2e           # interfaccia vera in Chromium + schermate
+npm run test:consegna                               # consegna push vera, dove il server e' ospitato
 npm run lint                                        # richiede eslint nel PATH, o via npx
 npm run icone                                       # rigenera le icone PWA
 ```
@@ -325,9 +350,14 @@ contano.
 
 ## Limiti, detti chiaramente
 
-1. **Le notifiche non arrivano a app chiusa.** Senza un server con chiavi VAPID, il
-   browser consegna solo mentre la scheda è aperta o da poco chiusa. `sw.js` ha già il
-   gestore `push` pronto: manca solo il pezzo server.
+1. **Le notifiche ad app chiusa richiedono che qualcuno tenga acceso il server.**
+   `server/server.js` c'è e funziona, ma va ospitato su un dominio con HTTPS.
+   Senza, l'app ripiega sul controllo a scheda aperta.
+   La **consegna vera non è verificata**: Chromium headless in questo ambiente
+   non raggiunge il servizio push di Google, quindi nessun messaggio è mai
+   arrivato a un browser reale. La cifratura sì: produce esattamente il corpo
+   del vettore di prova dell'RFC 8291, byte per byte. `npm run test:consegna`
+   chiude il cerchio dove il server sarà ospitato.
 2. **Non c'è sincronizzazione fra dispositivi.** Il backup si esporta e si importa a mano.
    È una conseguenza diretta del «niente email»: è un compromesso, non una svista.
 3. **Le definizioni sono quelle del Wikizionario**, non di un dizionario
@@ -344,7 +374,8 @@ contano.
 
 ## Passi successivi, in ordine di resa
 
-1. Server minimo per Web Push: è ciò che trasforma i promemoria da promessa a funzione.
+1. ~~Server per Web Push~~ — fatto. Resta da **ospitarlo** e verificare lì la
+   consegna: è ancora ciò che trasforma i promemoria da promessa a funzione.
 2. Riscrivere a mano le definizioni più goffe, partendo da quelle che compaiono
    di più: ogni voce riscritta esce dal vincolo CC BY-SA.
 3. Valutazione automatica delle frasi scritte: da «contiene la parola» a «la usa bene».

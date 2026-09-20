@@ -28,7 +28,7 @@ Readda.Store = (function () {
       profilo: { nick: n, codice: codice, lavoro: null, interessi: [], obiettivo: null, creato: Date.now(), completo: false },
       parole: {},
       stats: { striscia: 0, ultimoGiorno: null, giorni: [], scorse: 0 },
-      impostazioni: { notifiche: false, dose: 15, oraPromemoria: 20, esplicito: false }
+      impostazioni: { notifiche: false, dose: 15, oraPromemoria: 20, esplicito: false, gettone: null }
     };
   }
 
@@ -183,11 +183,26 @@ Readda.Store = (function () {
     return out;
   }
 
+  // Il server tiene le scadenze: se non gliele si aggiorna, sveglia per
+  // parole gia' fatte. Accorpato, perche' un giudizio dopo l'altro nel
+  // flusso non deve produrre una richiesta per carta.
+  var timerSincronia = null;
+  function avvisaServer() {
+    if (timerSincronia) clearTimeout(timerSincronia);
+    timerSincronia = setTimeout(function () {
+      timerSincronia = null;
+      if (window.Readda && Readda.Notifiche && Readda.Notifiche.sincronizza) {
+        Readda.Notifiche.sincronizza();
+      }
+    }, 4000);
+  }
+
   function salva() {
     if (!nick) return;
     var tutti = leggiTutti();
     tutti[nick] = stato;
     scriviTutti(tutti);
+    avvisaServer();
   }
 
   /* ---------- profilo ---------- */
