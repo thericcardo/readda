@@ -408,5 +408,10 @@ coordinamento sarebbe costato più del tempo risparmiato.
 - 309 definizioni sotto i 25 caratteri: da guardare se il punteggio di scheda
   dovrebbe scartarle invece di limitarsi a ordinarle. Voce 24 del piano, mai
   affrontata.
-- Le notifiche restano senza server: è il primo dei passi successivi, e
-  cambia la natura del progetto.
+- ~~Le notifiche restano senza server.~~ **Risolto il 20 settembre**, fuori da
+  questa sessione: `b13177a` aggiunge `server/`, con cifratura RFC 8291 e
+  firma VAPID scritte sul modulo `crypto` di Node e nessuna dipendenza.
+  Resta da **ospitarlo**: il codice c'è, la consegna vera non è verificata.
+  Le due suite del server sono agganciate a `npm test`, e la corsa 9 della
+  CI — innescata dalla spinta diretta sul ramo predefinito, che è il caso per
+  cui il filtro `on: push` esiste — è passata verde.

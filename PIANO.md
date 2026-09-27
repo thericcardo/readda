@@ -270,6 +270,9 @@ dei dati salvati. Valore basso, rischio medio: ultimo della lista, o mai.
 
 - **Server per le Web Push.** È il primo dei «passi successivi» del README, ma
   cambia la natura del progetto («nessun server») e non si può decidere qui.
+  *Aggiornamento del 27 settembre: è stato deciso e fatto da un'altra
+  sessione il 20 settembre (`b13177a`). L'esclusione qui sopra resta come
+  motivazione di allora, non come stato di adesso.*
 - **Valutazione automatica delle frasi.** Richiede un modello linguistico:
   fuori portata per una sessione di manutenzione.
 - **Riscrittura delle definizioni goffe.** È lavoro editoriale, non tecnico.
