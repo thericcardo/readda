@@ -45,6 +45,50 @@ a chiunque indovini un nickname di dirottarne i promemoria.
 Serve **HTTPS**: i service worker e il Web Push non funzionano in chiaro, tranne
 che su `localhost`.
 
+E serve aprire l'app **da lì**, non dall'artefatto su claude.ai. Nel recinto
+dell'artefatto i service worker non girano: da quel link il push non può
+partire per quanto bene sia ospitato il server. Ospitare il server significa
+spostare anche l'app, ed è gratis farlo — il server serve già i suoi file, con
+percorsi relativi, sullo stesso indirizzo.
+
+### Su Fly.io
+
+`Dockerfile` e `fly.toml` sono nel repository. L'immagine non ha uno stadio di
+costruzione e non installa niente tranne `su-exec`, perché il progetto non ha
+dipendenze a runtime.
+
+```bash
+fly apps create readda-XXXX                          # il nome dev'essere libero
+fly volumes create readda_dati --region fra --size 1
+
+# Le chiavi si generano una volta sola. Vanno nei segreti, non nel volume.
+node -e "console.log(JSON.stringify(require('./server/push').generaChiavi(),null,1))"
+fly secrets set VAPID_PUBBLICA=... VAPID_PRIVATA=... VAPID_SOGGETTO=mailto:tu@esempio.it
+
+fly deploy
+```
+
+Il nome scelto va messo anche in `fly.toml`, e il nome del volume deve
+coincidere con `[mounts] source`.
+
+Tre cose che si pagano care se si sbagliano, e sono tutte già scritte in
+`fly.toml`:
+
+- **`auto_stop_machines = 'off'`**. Il pianificatore gira ogni 60 secondi. Se
+  Fly spegne la macchina quando nessuno naviga — il suo comportamento
+  predefinito, ed è il motivo per cui costa poco — i promemoria non partono
+  mai. È l'unica cosa per cui questo server esiste: la macchina accesa è
+  esattamente ciò che si sta comprando.
+- **Il volume.** Senza, `dati-server/` sparisce a ogni riavvio e con lui tutte
+  le iscrizioni.
+- **Una macchina sola.** Un disco di Fly si attacca a una macchina in una
+  regione: due macchine sono due dischi, cioè iscritti divisi a metà, e metà
+  delle persone smette di ricevere i promemoria senza che nessuno se ne
+  accorga.
+
+Le chiavi stanno nei segreti perché sono l'unica cosa non ricostruibile: lì
+sopravvivono anche a un disco perso o ricreato.
+
 ### Con un reverse proxy (Caddy, la via più corta)
 
 ```
@@ -139,11 +183,19 @@ node server/prova-server.js   # API e pianificatore
 **Non provato qui:** la consegna vera. Chromium headless in questo ambiente non
 raggiunge il servizio push di Google (`Registration failed - permission
 denied`), quindi nessun messaggio è mai arrivato a un browser reale. Va
-verificato dove il server sarà ospitato:
+verificato una volta ospitato, ed è il primo comando da lanciare dopo il primo
+`fly deploy`:
 
 ```bash
-node server/prova-vera.js     # BASE=https://readda.tuodominio.it
+BASE=https://<nome>.fly.dev node server/prova-vera.js
 ```
 
 Si iscrive con un browser vero, manda un push e riporta cosa risponde il
-servizio. Una risposta `201` significa preso in carico.
+servizio. Una risposta `201` significa preso in carico. La prova cerca
+Chromium da sola: `CHROME=/percorso/al/chrome` se sta in un posto suo.
+
+**Non provata nemmeno la costruzione dell'immagine.** `Dockerfile` e
+`server/avvio.sh` sono scritti ma mai passati per un `docker build`: in questo
+ambiente il demone non gira. Provato invece l'insieme dei file che l'immagine
+copia, avviato da una cartella pulita — risponde su tutte le rotte dell'app e
+404 sui documenti di lavorazione.

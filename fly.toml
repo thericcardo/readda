@@ -1,0 +1,62 @@
+# Readda su Fly.io.
+#
+#   fly apps create readda-XXXX                       # il nome dev'essere libero
+#   fly volumes create readda_dati --region fra --size 1
+#   node -e "console.log(JSON.stringify(require('./server/push').generaChiavi(),null,1))"
+#   fly secrets set VAPID_PUBBLICA=... VAPID_PRIVATA=... VAPID_SOGGETTO=mailto:tu@esempio.it
+#   fly deploy
+#
+# Poi si apre da https://<nome>.fly.dev. HTTPS c'e' gia' e non serve comprare
+# un dominio - ma serve aprirla da li' e non dall'artefatto di claude.ai: nel
+# recinto dell'artefatto i service worker non girano, quindi da quel link il
+# push non potra' mai partire, per quanto bene sia ospitato il server.
+#
+# Le chiavi VAPID stanno nei segreti e non nel volume di proposito. Sono
+# l'unica cosa davvero non ricostruibile: cambiarle invalida ogni iscrizione
+# esistente, e chi le aveva deve riattivare i promemoria a mano. Nei segreti
+# sopravvivono anche a un disco perso o ricreato.
+
+app = "readda"
+primary_region = "fra"
+
+[env]
+  PORT = "8080"
+
+[http_service]
+  internal_port = 8080
+  force_https = true
+  processes = ["app"]
+
+  # Le due righe che decidono se i promemoria esistono davvero.
+  #
+  # Il server controlla le scadenze ogni 60 secondi. Se Fly spegne la macchina
+  # quando nessuno naviga - che e' il comportamento predefinito, ed e' il
+  # motivo per cui costa poco - quel controllo non gira, e un promemoria che
+  # deve arrivare «anche ad app chiusa» non arriva mai. Si paga la macchina
+  # accesa perche' e' esattamente la cosa che si sta comprando.
+  #
+  # Con una versione vecchia di flyctl, al posto di 'off' va il booleano false.
+  auto_stop_machines = 'off'
+  min_machines_running = 1
+
+  [[http_service.checks]]
+    interval = "30s"
+    timeout = "5s"
+    grace_period = "10s"
+    method = "GET"
+    path = "/api/chiave"
+
+# Il disco che tiene le iscrizioni. Il nome dev'essere lo stesso passato a
+# `fly volumes create`, e nella stessa regione di primary_region.
+[mounts]
+  source = "readda_dati"
+  destination = "/app/dati-server"
+
+# Una macchina sola, e non e' per risparmiare: un disco di Fly si attacca a
+# una macchina in una regione. Con due macchine ognuna avrebbe il suo disco,
+# quindi iscritti divisi a meta' - e meta' delle persone smetterebbe di
+# ricevere i promemoria senza che nessuno se ne accorga. Se un giorno serve
+# scalare, prima serve un archivio condiviso, non una seconda macchina.
+[[vm]]
+  size = "shared-cpu-1x"
+  memory = "256mb"

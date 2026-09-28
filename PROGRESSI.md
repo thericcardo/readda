@@ -411,7 +411,11 @@ coordinamento sarebbe costato più del tempo risparmiato.
 - ~~Le notifiche restano senza server.~~ **Risolto il 20 settembre**, fuori da
   questa sessione: `b13177a` aggiunge `server/`, con cifratura RFC 8291 e
   firma VAPID scritte sul modulo `crypto` di Node e nessuna dipendenza.
-  Resta da **ospitarlo**: il codice c'è, la consegna vera non è verificata.
+  Resta da **ospitarlo**. Il 28 settembre sono arrivati `Dockerfile`,
+  `server/avvio.sh` e `fly.toml`, quindi manca un `fly deploy` e non un
+  progetto. La **consegna vera** resta non verificata, e lo sarà finché
+  `npm run test:consegna` non gira contro l'indirizzo ospitato: è l'ultima
+  cosa in questo progetto che nessuna prova qui dentro può dimostrare.
   Le due suite del server sono agganciate a `npm test`, e la corsa 9 della
   CI — innescata dalla spinta diretta sul ramo predefinito, che è il caso per
   cui il filtro `on: push` esiste — è passata verde.

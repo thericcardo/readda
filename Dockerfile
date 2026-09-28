@@ -30,7 +30,11 @@ COPY server/ ./server/
 RUN mkdir -p dati-server && chown -R node:node /app
 VOLUME ["/app/dati-server"]
 
-USER node
+# su-exec serve a server/avvio.sh, che parte da root solo per rimettere a
+# posto l'appartenenza del volume e poi lascia il posto all'utente `node`.
+# E' l'unica cosa installata nell'immagine, e pesa una ventina di kilobyte.
+RUN apk add --no-cache su-exec
+
 ENV PORT=8080
 EXPOSE 8080
 
@@ -39,4 +43,4 @@ EXPOSE 8080
 HEALTHCHECK --interval=30s --timeout=3s --start-period=5s \
   CMD wget -qO- http://127.0.0.1:8080/api/chiave || exit 1
 
-CMD ["node", "server/server.js"]
+ENTRYPOINT ["/app/server/avvio.sh"]
