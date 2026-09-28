@@ -184,6 +184,37 @@ const ISCRIZIONE = {
   r = await chiama('/api/iscrizione', 'DELETE', { nick: 'Altro', gettone: g2 });
   p('col gettone si cancella', r.stato === 200 && !app.archivio.utente('Altro'));
 
+  /* Dietro un proxy, req.socket.remoteAddress e' l'indirizzo del proxy:
+   * uguale per tutti, quindi il limite diventerebbe uno solo per il mondo
+   * intero e una persona rumorosa chiuderebbe fuori le altre. Fidarsi di
+   * X-Forwarded-For a scatola chiusa sarebbe pero' peggio - chiunque puo'
+   * scriverlo e saltare il limite del tutto - quindi l'intestazione si guarda
+   * solo quando lo dice una variabile d'ambiente, che il cliente non puo'
+   * toccare. */
+  gruppo('Limite di frequenza dietro un proxy');
+  const dietro = avvia({
+    porta: 0,
+    archivio: path.join(tmp, 'utenti-proxy.json'),
+    chiavi: Push.generaChiavi(),
+    senzaTimer: true,
+    dietroProxy: true,
+    invia: async () => ({ stato: 201 }),
+  });
+  const portaD = await dietro.apri();
+  const baseD = 'http://127.0.0.1:' + portaD;
+  const bussa = (ipFinto) => fetch(baseD + '/api/chiave', { headers: { 'Fly-Client-IP': ipFinto } });
+
+  let fermato = false;
+  for (let i = 0; i < 70; i++) {
+    if ((await bussa('203.0.113.7')).status === 429) { fermato = true; break; }
+  }
+  p('un indirizzo rumoroso viene fermato', fermato);
+  /* L'asserzione che conta: senza la correzione questa e' 429, perche' le due
+   * richieste finiscono nello stesso secchio - quello del socket. */
+  const altro = await bussa('203.0.113.99');
+  p('un altro indirizzo non paga per lui', altro.status === 200, altro.status);
+  await dietro.chiudi();
+
   gruppo('Limite di frequenza');
   let bloccato = false;
   for (let i = 0; i < 80; i++) {
@@ -191,6 +222,14 @@ const ISCRIZIONE = {
     if (rr.stato === 429) { bloccato = true; break; }
   }
   p('oltre sessanta richieste al minuto si viene fermati', bloccato);
+
+  /* Qui il secchio del socket e' esaurito. Un'intestazione Fly-Client-IP mai
+   * vista deve restare 429: se aprisse un secchio nuovo, chiunque salterebbe
+   * il limite scrivendosi un indirizzo diverso a ogni richiesta. Senza
+   * `dietroProxy` l'intestazione non si guarda, ed e' il punto. */
+  const finto = await fetch(base + '/api/chiave', { headers: { 'Fly-Client-IP': '198.51.100.1' } });
+  p('senza proxy dichiarato l\'intestazione non fa saltare il limite',
+    finto.status === 429, finto.status);
 
   await app.chiudi();
   fs.rmSync(tmp, { recursive: true, force: true });

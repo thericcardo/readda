@@ -426,6 +426,16 @@ coordinamento sarebbe costato più del tempo risparmiato.
   intero. Adesso 403, con quattro asserzioni in `server/prova-server.js` che
   chiedono **esattamente 403** e non «diverso da 200», perché un 404 da file
   assente le farebbe passare anche col difetto dentro.
+  Stessa passata, difetto minore: il limite di frequenza contava per
+  `req.socket.remoteAddress`, che dietro il proxy di Fly è lo stesso per tutti
+  — 60 richieste al minuto per il mondo intero invece che per persona. Ora
+  guarda `Fly-Client-IP`, ma solo se lo dice una variabile d'ambiente, perché
+  fidarsi dell'intestazione a scatola chiusa sarebbe peggio: basterebbe
+  cambiarsela a ogni richiesta. Anche qui la prova è stata verificata
+  rimettendo il difetto: con la fiducia incondizionata l'asserzione risponde
+  200 invece di 429. La prima versione di quella asserzione era una tautologia
+  (`|| true`) — il terzo caso in questa sessione, e l'unico trovato prima di
+  farne un commit.
   Le due suite del server sono agganciate a `npm test`, e la corsa 9 della
   CI — innescata dalla spinta diretta sul ramo predefinito, che è il caso per
   cui il filtro `on: push` esiste — è passata verde.

@@ -152,7 +152,17 @@ gettone di ogni iscritto) erano leggibili da chiunque conoscesse il percorso.
 Con quei due file si possono firmare messaggi a nome del server e scriverli a
 tutti gli iscritti. Su `localhost` non si vedeva; ospitato, bastava chiederlo.
 
-Limite di frequenza: 60 richieste al minuto per indirizzo.
+Limite di frequenza: 60 richieste al minuto per indirizzo, e solo sulle rotte
+`/api/`: i file dell'app non passano di lì.
+
+**Dietro un proxy** l'indirizzo del socket è quello del proxy, uguale per
+tutti, e il limite diventerebbe uno solo per il mondo intero. Il server guarda
+allora `Fly-Client-IP`, o il primo elemento di `X-Forwarded-For` — ma **solo**
+se `FLY_APP_NAME` o `DIETRO_PROXY` sono nell'ambiente. Quelle variabili le
+mette la piattaforma, non il cliente: fidarsi dell'intestazione a scatola
+chiusa sarebbe peggio del problema, perché basterebbe cambiarsela a ogni
+richiesta per saltare il limite del tutto. Su Fly non c'è niente da
+configurare, `FLY_APP_NAME` c'è già.
 
 ## Quando scrive
 

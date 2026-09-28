@@ -148,6 +148,26 @@ function scadenzeValide(s) {
 }
 
 /* ------------------------------------------------- limite di frequenza */
+
+/* Dietro un proxy, `req.socket.remoteAddress` e' l'indirizzo del proxy:
+ * uguale per tutti. Il limite diventerebbe uno solo per il mondo intero, e
+ * una persona rumorosa chiuderebbe fuori tutte le altre.
+ *
+ * Fidarsi di X-Forwarded-For a scatola chiusa sarebbe pero' peggio del
+ * problema: chiunque puo' scriversi quell'intestazione e cambiarla a ogni
+ * richiesta, saltando il limite del tutto. Quindi la si guarda solo quando lo
+ * dice una variabile d'ambiente - che il cliente non puo' toccare. Su Fly,
+ * FLY_APP_NAME la mette la piattaforma da se'. */
+function indirizzo(req, dietroProxy) {
+  if (dietroProxy) {
+    const suo = req.headers['fly-client-ip'];
+    if (suo) return String(suo).trim();
+    const inoltrato = req.headers['x-forwarded-for'];
+    if (inoltrato) return String(inoltrato).split(',')[0].trim();
+  }
+  return req.socket.remoteAddress || '?';
+}
+
 const colpi = new Map();
 function troppiTentativi(ip) {
   const adesso = Date.now();
@@ -166,10 +186,12 @@ function avvia(opzioni) {
   const archivio = new Archivio(opzioni.archivio || path.join(DATI, 'utenti.json'));
   const inviaPush = opzioni.invia || ((iscr, testo) =>
     Push.invia(iscr, testo, chiavi, { soggetto: SOGGETTO, ttl: 6 * 3600 }));
+  const dietroProxy = opzioni.dietroProxy !== undefined ? opzioni.dietroProxy
+    : !!(process.env.FLY_APP_NAME || process.env.DIETRO_PROXY);
 
   const server = http.createServer(async (req, res) => {
     const via = url.parse(req.url).pathname;
-    const ip = req.socket.remoteAddress || '?';
+    const ip = indirizzo(req, dietroProxy);
 
     res.setHeader('X-Content-Type-Options', 'nosniff');
     res.setHeader('Referrer-Policy', 'no-referrer');
