@@ -59,6 +59,34 @@ const ISCRIZIONE = {
   const fuga = await fetch(base + '/../../etc/passwd');
   p('non si esce dalla cartella del progetto', fuga.status === 404 || fuga.status === 403, fuga.status);
 
+  /* dati-server/ sta DENTRO la radice del progetto, quindi la guardia qui
+   * sopra - che vieta solo di uscirne - non lo fermava: chiavi.json con la
+   * chiave privata VAPID e utenti.json con endpoint, chiavi e gettoni di ogni
+   * iscritto erano leggibili da chiunque conoscesse il percorso. Su localhost
+   * non si vedeva; ospitato, bastava chiederlo.
+   *
+   * L'asserzione e' su 403 e non su «diverso da 200» apposta: senza guardia
+   * un file assente risponde 404, e una prova contenta del 404 passerebbe
+   * anche col difetto dentro. Per questo ce n'e' anche una su un file che
+   * esiste davvero. */
+  const spia = path.join(path.dirname(__dirname), 'dati-server', 'prova-spia.json');
+  fs.mkdirSync(path.dirname(spia), { recursive: true });
+  fs.writeFileSync(spia, '{"privata":"non-deve-uscire"}');
+  try {
+    const chiavi = await fetch(base + '/dati-server/chiavi.json');
+    p('la chiave privata non e\' servita', chiavi.status === 403, chiavi.status);
+    const utenti = await fetch(base + '/dati-server/utenti.json');
+    p('l\'archivio degli iscritti non e\' servito', utenti.status === 403, utenti.status);
+    const vista = await fetch(base + '/dati-server/prova-spia.json');
+    const corpo = await vista.text();
+    p('nemmeno un file di dati-server che esiste davvero',
+      vista.status === 403 && corpo.indexOf('non-deve-uscire') === -1, vista.status);
+    const sorgente = await fetch(base + '/server/server.js');
+    p('il sorgente del server non e\' fra i file dell\'app', sorgente.status === 403, sorgente.status);
+  } finally {
+    fs.rmSync(spia, { force: true });
+  }
+
   gruppo('Chiave pubblica');
   const k = await chiama('/api/chiave', 'GET');
   p('restituisce la chiave VAPID', k.stato === 200 && Push.dab64u(k.dati.chiave).length === 65);

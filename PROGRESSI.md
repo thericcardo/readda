@@ -416,6 +416,16 @@ coordinamento sarebbe costato più del tempo risparmiato.
   progetto. La **consegna vera** resta non verificata, e lo sarà finché
   `npm run test:consegna` non gira contro l'indirizzo ospitato: è l'ultima
   cosa in questo progetto che nessuna prova qui dentro può dimostrare.
+  Scrivendo quella configurazione è saltato fuori un difetto che esisteva dal
+  20 settembre e che solo l'ospitalità rendeva raggiungibile: `dati-server/`
+  sta dentro la radice servita, e il controllo sui percorsi impediva solo di
+  *uscire* dalla cartella del progetto. `GET /dati-server/chiavi.json`
+  restituiva la chiave privata VAPID, `utenti.json` endpoint, chiavi e gettone
+  di ogni iscritto — abbastanza per scrivere a tutti a nome del server.
+  Verificato prima di correggerlo, con un file vero: 200 e il contenuto
+  intero. Adesso 403, con quattro asserzioni in `server/prova-server.js` che
+  chiedono **esattamente 403** e non «diverso da 200», perché un 404 da file
+  assente le farebbe passare anche col difetto dentro.
   Le due suite del server sono agganciate a `npm test`, e la corsa 9 della
   CI — innescata dalla spinta diretta sul ramo predefinito, che è il caso per
   cui il filtro `on: push` esiste — è passata verde.

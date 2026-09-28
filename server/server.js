@@ -72,6 +72,19 @@ function serviFile(percorsoRichiesto, res) {
     res.writeHead(403).end('vietato');
     return;
   }
+  // E niente dati-server/, che invece sta DENTRO la radice: il controllo qui
+  // sopra vieta solo di uscirne, quindi lasciava servire chiavi.json - la
+  // chiave privata VAPID - e utenti.json, con endpoint, chiavi e gettone di
+  // ogni iscritto. Con quei due file chiunque puo' firmare messaggi a nome
+  // del server e scrivere a tutti gli iscritti. Su localhost non si vedeva;
+  // dal momento in cui il server e' ospitato basta conoscere il percorso.
+  // Stessa riga tiene fuori server/: il sorgente e' su GitHub, ma non ha
+  // niente da fare fra i file che l'app serve.
+  if (assoluto === DATI || assoluto.startsWith(DATI + path.sep) ||
+      assoluto.startsWith(path.join(RADICE, 'server') + path.sep)) {
+    res.writeHead(403).end('vietato');
+    return;
+  }
   fs.readFile(assoluto, (err, corpo) => {
     if (err) { res.writeHead(404, { 'Content-Type': 'text/plain' }).end('non trovato'); return; }
     const est = path.extname(assoluto).toLowerCase();

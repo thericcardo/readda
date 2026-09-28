@@ -145,6 +145,13 @@ iscritti.
 | `/api/iscrizione` | DELETE | Dimentica tutto di un nickname. Richiede il gettone. |
 | tutto il resto | GET | I file dell'app. |
 
+`dati-server/` e `server/` rispondono **403**, non 404. Stanno dentro la radice
+del progetto, quindi il controllo che impedisce di *uscirne* non li fermava:
+`chiavi.json` (la chiave privata VAPID) e `utenti.json` (endpoint, chiavi e
+gettone di ogni iscritto) erano leggibili da chiunque conoscesse il percorso.
+Con quei due file si possono firmare messaggi a nome del server e scriverli a
+tutti gli iscritti. Su `localhost` non si vedeva; ospitato, bastava chiederlo.
+
 Limite di frequenza: 60 richieste al minuto per indirizzo.
 
 ## Quando scrive
