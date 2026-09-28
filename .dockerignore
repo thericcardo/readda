@@ -1,0 +1,12 @@
+# Il contesto di costruzione non ha bisogno di niente di tutto questo: la
+# Dockerfile copia percorsi espliciti, ma il contesto viaggia comunque verso
+# il demone, e scatti/ da solo pesa quanto il resto del progetto.
+.git
+scatti
+strumenti
+test
+node_modules
+dati-server
+*.md
+eslint.config.mjs
+package-lock.json
