@@ -164,6 +164,29 @@ chiusa sarebbe peggio del problema, perché basterebbe cambiarsela a ogni
 richiesta per saltare il limite del tutto. Su Fly non c'è niente da
 configurare, `FLY_APP_NAME` c'è già.
 
+**L'endpoint deve essere di un servizio push conosciuto:** `fcm.googleapis.com`
+(Chrome, Edge, Opera, Brave, Samsung), `web.push.apple.com` (Safari),
+`*.push.services.mozilla.com` (Firefox), `*.notify.windows.com` (Edge prima di
+Chromium), `android.googleapis.com` (Chrome vecchio). Senza questa lista
+l'endpoint poteva essere qualunque indirizzo https, e il pianificatore avrebbe
+fatto richieste in uscita verso host scelti da chi si iscrive.
+
+Una lista di host ammessi prima o poi sbaglia, perché i browser ne aggiungono.
+La scelta non è *se* sbagliare ma *come*, e qui sbaglia **rumorosamente**: chi
+si iscrive riceve `servizio push sconosciuto: <host>`, l'app lo scrive sotto
+l'interruttore dei promemoria invece di limitarsi a «accesi, ma solo ad app
+aperta», e il server lo mette nel registro. Allungarla senza aspettare una
+versione nuova:
+
+```bash
+SERVIZI_PUSH=push.uno.example,push.due.example node server/server.js
+```
+
+Quello che la lista **non** risolve: chiunque può registrare quanti nickname
+vuole con un endpoint `fcm.googleapis.com` sintatticamente valido, e
+`dati-server/utenti.json` cresce senza tetto. Su un disco da 1 GB è un modo
+lento ma silenzioso di riempirlo. Un tetto non c'è ancora.
+
 ## Quando scrive
 
 - Mai prima delle 9 né dopo le 21, ora locale di chi legge.

@@ -436,6 +436,21 @@ coordinamento sarebbe costato più del tempo risparmiato.
   200 invece di 429. La prima versione di quella asserzione era una tautologia
   (`|| true`) — il terzo caso in questa sessione, e l'unico trovato prima di
   farne un commit.
+  Terza passata, su richiesta: `iscrizioneValida()` accettava **qualunque**
+  URL https come endpoint. Adesso c'è la lista dei servizi push veri, ma il
+  punto non è la lista — una lista di host ammessi prima o poi sbaglia, perché
+  i browser ne aggiungono. Il punto è che sbagli **rumorosamente**: il rifiuto
+  nomina l'host, il server lo scrive nel registro e l'app lo mostra sotto
+  l'interruttore. Senza quest'ultimo pezzo il lavoro sarebbe stato inutile:
+  `js/views/io.js` buttava via `r.motivo` e mostrava «Accesi, ma solo ad app
+  aperta», cioè esattamente la degradazione silenziosa che la lista doveva
+  togliere. Le cinque asserzioni «accetta il servizio di X» erano vuote finché
+  la lista non è esistita: verificate togliendo Safari dall'elenco (rossa) e
+  ignorando i servizi aggiunti dall'ambiente (rossa). **Quello che la lista non
+  risolve**, e resta aperto: l'archivio cresce senza tetto, perché basta un
+  endpoint `fcm.googleapis.com` sintatticamente valido e un nickname nuovo.
+  Non verificato a runtime il ramo nuovo di `io.js`: serve un server vero più
+  un browser con un servizio push raggiungibile, che qui non c'è.
   Le due suite del server sono agganciate a `npm test`, e la corsa 9 della
   CI — innescata dalla spinta diretta sul ramo predefinito, che è il caso per
   cui il filtro `on: push` esiste — è passata verde.

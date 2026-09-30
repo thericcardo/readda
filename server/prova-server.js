@@ -108,6 +108,54 @@ const ISCRIZIONE = {
   r = await chiama('/api/iscrizione', 'POST', { nick: 'ric', iscrizione: ISCRIZIONE, gettone: gettone });
   p('col gettone giusto si puo\' riaggiornare', r.stato === 200);
 
+  /* La lista dei servizi push. Una lista di host ammessi prima o poi sbaglia,
+   * perche' i browser ne aggiungono: la scelta non e' se sbagliare, ma come.
+   * Rifiutare dicendo quale host era si vede subito - lo legge chi si iscrive
+   * e lo scrive il registro del server; accettare e non consegnare mai non lo
+   * scopre nessuno, ed e' il guasto peggiore per un'app di promemoria. */
+  let quanti = 0;
+  const conEndpoint = (e) => ({ nick: 'Servizio' + (++quanti),
+                                iscrizione: { endpoint: e, keys: ISCRIZIONE.keys } });
+  for (const [nome, e] of [
+    ['Chrome, Edge, Opera, Samsung', 'https://fcm.googleapis.com/fcm/send/abc'],
+    ['Firefox', 'https://updates.push.services.mozilla.com/wpush/v2/abc'],
+    ['Safari', 'https://web.push.apple.com/abc'],
+    ['Edge EdgeHTML', 'https://wns2-by3p.notify.windows.com/w/?token=abc'],
+  ]) {
+    const rs = await chiama('/api/iscrizione', 'POST', conEndpoint(e));
+    p('accetta il servizio push di ' + nome, rs.stato === 200, rs.dati);
+  }
+
+  /* Il confine dei sottodomini: `.push.services.mozilla.com` deve prendere
+   * updates.push.services.mozilla.com e NON xpush.services.mozilla.com, che e'
+   * un dominio di qualcun altro con lo stesso finale. */
+  r = await chiama('/api/iscrizione', 'POST', conEndpoint('https://xpush.services.mozilla.com/abc'));
+  p('un suffisso non basta: serve il confine di etichetta', r.stato === 400, r.dati);
+
+  r = await chiama('/api/iscrizione', 'POST', conEndpoint('https://un-host-qualunque.example/xyz'));
+  p('rifiuta un host che non e\' un servizio push', r.stato === 400, r.dati);
+  p('e dice quale host era, cosi\' si puo\' aggiungere',
+    !!r.dati && typeof r.dati.errore === 'string'
+    && r.dati.errore.indexOf('un-host-qualunque.example') !== -1, r.dati);
+
+  /* L'appiglio: la lista invecchia, e chi ospita deve poterla allungare senza
+   * aspettare una versione nuova. */
+  const conExtra = avvia({
+    porta: 0,
+    archivio: path.join(tmp, 'utenti-extra.json'),
+    chiavi: Push.generaChiavi(),
+    senzaTimer: true,
+    servizi: ['push.mio.example'],
+    invia: async () => ({ stato: 201 }),
+  });
+  const portaE = await conExtra.apri();
+  const rx = await fetch('http://127.0.0.1:' + portaE + '/api/iscrizione', {
+    method: 'POST', headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(conEndpoint('https://push.mio.example/abc')),
+  });
+  p('un servizio in piu\' si aggiunge senza toccare il codice', rx.status === 200, rx.status);
+  await conExtra.chiudi();
+
   gruppo('Scadenze');
   const ieri = Date.now() - 36e5;
   r = await chiama('/api/scadenze', 'POST', { nick: 'Ric', gettone: 'sbagliato', scadenze: [] });

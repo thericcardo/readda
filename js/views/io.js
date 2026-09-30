@@ -177,6 +177,15 @@ Readda.Io = (function () {
         S.imposta('notifiche', true);
         Readda.Notifiche.avvia();
         U.brindisi('Accesi, ma solo ad app aperta');
+        // Un server c'era e ha rifiutato: il motivo va letto. Senza, «solo ad
+        // app aperta» sembra una scelta di progetto, mentre e' un guasto - e
+        // se il rifiuto e' «servizio push sconosciuto» la colpa e' della
+        // lista del server, non di chi si iscrive, che pero' e' l'unico in
+        // grado di segnalarlo.
+        if (r.motivo && r.motivo !== 'nessun server') {
+          var nota = U.uno('#nota-notifiche');
+          if (nota) nota.textContent = 'Il server ha rifiutato l\'iscrizione: ' + r.motivo;
+        }
       });
     });
   }
