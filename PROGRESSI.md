@@ -408,5 +408,49 @@ coordinamento sarebbe costato più del tempo risparmiato.
 - 309 definizioni sotto i 25 caratteri: da guardare se il punteggio di scheda
   dovrebbe scartarle invece di limitarsi a ordinarle. Voce 24 del piano, mai
   affrontata.
-- Le notifiche restano senza server: è il primo dei passi successivi, e
-  cambia la natura del progetto.
+- ~~Le notifiche restano senza server.~~ **Risolto il 20 settembre**, fuori da
+  questa sessione: `b13177a` aggiunge `server/`, con cifratura RFC 8291 e
+  firma VAPID scritte sul modulo `crypto` di Node e nessuna dipendenza.
+  Resta da **ospitarlo**. Il 28 settembre sono arrivati `Dockerfile`,
+  `server/avvio.sh` e `fly.toml`, quindi manca un `fly deploy` e non un
+  progetto. La **consegna vera** resta non verificata, e lo sarà finché
+  `npm run test:consegna` non gira contro l'indirizzo ospitato: è l'ultima
+  cosa in questo progetto che nessuna prova qui dentro può dimostrare.
+  Scrivendo quella configurazione è saltato fuori un difetto che esisteva dal
+  20 settembre e che solo l'ospitalità rendeva raggiungibile: `dati-server/`
+  sta dentro la radice servita, e il controllo sui percorsi impediva solo di
+  *uscire* dalla cartella del progetto. `GET /dati-server/chiavi.json`
+  restituiva la chiave privata VAPID, `utenti.json` endpoint, chiavi e gettone
+  di ogni iscritto — abbastanza per scrivere a tutti a nome del server.
+  Verificato prima di correggerlo, con un file vero: 200 e il contenuto
+  intero. Adesso 403, con quattro asserzioni in `server/prova-server.js` che
+  chiedono **esattamente 403** e non «diverso da 200», perché un 404 da file
+  assente le farebbe passare anche col difetto dentro.
+  Stessa passata, difetto minore: il limite di frequenza contava per
+  `req.socket.remoteAddress`, che dietro il proxy di Fly è lo stesso per tutti
+  — 60 richieste al minuto per il mondo intero invece che per persona. Ora
+  guarda `Fly-Client-IP`, ma solo se lo dice una variabile d'ambiente, perché
+  fidarsi dell'intestazione a scatola chiusa sarebbe peggio: basterebbe
+  cambiarsela a ogni richiesta. Anche qui la prova è stata verificata
+  rimettendo il difetto: con la fiducia incondizionata l'asserzione risponde
+  200 invece di 429. La prima versione di quella asserzione era una tautologia
+  (`|| true`) — il terzo caso in questa sessione, e l'unico trovato prima di
+  farne un commit.
+  Terza passata, su richiesta: `iscrizioneValida()` accettava **qualunque**
+  URL https come endpoint. Adesso c'è la lista dei servizi push veri, ma il
+  punto non è la lista — una lista di host ammessi prima o poi sbaglia, perché
+  i browser ne aggiungono. Il punto è che sbagli **rumorosamente**: il rifiuto
+  nomina l'host, il server lo scrive nel registro e l'app lo mostra sotto
+  l'interruttore. Senza quest'ultimo pezzo il lavoro sarebbe stato inutile:
+  `js/views/io.js` buttava via `r.motivo` e mostrava «Accesi, ma solo ad app
+  aperta», cioè esattamente la degradazione silenziosa che la lista doveva
+  togliere. Le cinque asserzioni «accetta il servizio di X» erano vuote finché
+  la lista non è esistita: verificate togliendo Safari dall'elenco (rossa) e
+  ignorando i servizi aggiunti dall'ambiente (rossa). **Quello che la lista non
+  risolve**, e resta aperto: l'archivio cresce senza tetto, perché basta un
+  endpoint `fcm.googleapis.com` sintatticamente valido e un nickname nuovo.
+  Non verificato a runtime il ramo nuovo di `io.js`: serve un server vero più
+  un browser con un servizio push raggiungibile, che qui non c'è.
+  Le due suite del server sono agganciate a `npm test`, e la corsa 9 della
+  CI — innescata dalla spinta diretta sul ramo predefinito, che è il caso per
+  cui il filtro `on: push` esiste — è passata verde.

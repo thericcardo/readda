@@ -45,6 +45,50 @@ a chiunque indovini un nickname di dirottarne i promemoria.
 Serve **HTTPS**: i service worker e il Web Push non funzionano in chiaro, tranne
 che su `localhost`.
 
+E serve aprire l'app **da lì**, non dall'artefatto su claude.ai. Nel recinto
+dell'artefatto i service worker non girano: da quel link il push non può
+partire per quanto bene sia ospitato il server. Ospitare il server significa
+spostare anche l'app, ed è gratis farlo — il server serve già i suoi file, con
+percorsi relativi, sullo stesso indirizzo.
+
+### Su Fly.io
+
+`Dockerfile` e `fly.toml` sono nel repository. L'immagine non ha uno stadio di
+costruzione e non installa niente tranne `su-exec`, perché il progetto non ha
+dipendenze a runtime.
+
+```bash
+fly apps create readda-XXXX                          # il nome dev'essere libero
+fly volumes create readda_dati --region fra --size 1
+
+# Le chiavi si generano una volta sola. Vanno nei segreti, non nel volume.
+node -e "console.log(JSON.stringify(require('./server/push').generaChiavi(),null,1))"
+fly secrets set VAPID_PUBBLICA=... VAPID_PRIVATA=... VAPID_SOGGETTO=mailto:tu@esempio.it
+
+fly deploy
+```
+
+Il nome scelto va messo anche in `fly.toml`, e il nome del volume deve
+coincidere con `[mounts] source`.
+
+Tre cose che si pagano care se si sbagliano, e sono tutte già scritte in
+`fly.toml`:
+
+- **`auto_stop_machines = 'off'`**. Il pianificatore gira ogni 60 secondi. Se
+  Fly spegne la macchina quando nessuno naviga — il suo comportamento
+  predefinito, ed è il motivo per cui costa poco — i promemoria non partono
+  mai. È l'unica cosa per cui questo server esiste: la macchina accesa è
+  esattamente ciò che si sta comprando.
+- **Il volume.** Senza, `dati-server/` sparisce a ogni riavvio e con lui tutte
+  le iscrizioni.
+- **Una macchina sola.** Un disco di Fly si attacca a una macchina in una
+  regione: due macchine sono due dischi, cioè iscritti divisi a metà, e metà
+  delle persone smette di ricevere i promemoria senza che nessuno se ne
+  accorga.
+
+Le chiavi stanno nei segreti perché sono l'unica cosa non ricostruibile: lì
+sopravvivono anche a un disco perso o ricreato.
+
 ### Con un reverse proxy (Caddy, la via più corta)
 
 ```
@@ -101,7 +145,47 @@ iscritti.
 | `/api/iscrizione` | DELETE | Dimentica tutto di un nickname. Richiede il gettone. |
 | tutto il resto | GET | I file dell'app. |
 
-Limite di frequenza: 60 richieste al minuto per indirizzo.
+`dati-server/` e `server/` rispondono **403**, non 404. Stanno dentro la radice
+del progetto, quindi il controllo che impedisce di *uscirne* non li fermava:
+`chiavi.json` (la chiave privata VAPID) e `utenti.json` (endpoint, chiavi e
+gettone di ogni iscritto) erano leggibili da chiunque conoscesse il percorso.
+Con quei due file si possono firmare messaggi a nome del server e scriverli a
+tutti gli iscritti. Su `localhost` non si vedeva; ospitato, bastava chiederlo.
+
+Limite di frequenza: 60 richieste al minuto per indirizzo, e solo sulle rotte
+`/api/`: i file dell'app non passano di lì.
+
+**Dietro un proxy** l'indirizzo del socket è quello del proxy, uguale per
+tutti, e il limite diventerebbe uno solo per il mondo intero. Il server guarda
+allora `Fly-Client-IP`, o il primo elemento di `X-Forwarded-For` — ma **solo**
+se `FLY_APP_NAME` o `DIETRO_PROXY` sono nell'ambiente. Quelle variabili le
+mette la piattaforma, non il cliente: fidarsi dell'intestazione a scatola
+chiusa sarebbe peggio del problema, perché basterebbe cambiarsela a ogni
+richiesta per saltare il limite del tutto. Su Fly non c'è niente da
+configurare, `FLY_APP_NAME` c'è già.
+
+**L'endpoint deve essere di un servizio push conosciuto:** `fcm.googleapis.com`
+(Chrome, Edge, Opera, Brave, Samsung), `web.push.apple.com` (Safari),
+`*.push.services.mozilla.com` (Firefox), `*.notify.windows.com` (Edge prima di
+Chromium), `android.googleapis.com` (Chrome vecchio). Senza questa lista
+l'endpoint poteva essere qualunque indirizzo https, e il pianificatore avrebbe
+fatto richieste in uscita verso host scelti da chi si iscrive.
+
+Una lista di host ammessi prima o poi sbaglia, perché i browser ne aggiungono.
+La scelta non è *se* sbagliare ma *come*, e qui sbaglia **rumorosamente**: chi
+si iscrive riceve `servizio push sconosciuto: <host>`, l'app lo scrive sotto
+l'interruttore dei promemoria invece di limitarsi a «accesi, ma solo ad app
+aperta», e il server lo mette nel registro. Allungarla senza aspettare una
+versione nuova:
+
+```bash
+SERVIZI_PUSH=push.uno.example,push.due.example node server/server.js
+```
+
+Quello che la lista **non** risolve: chiunque può registrare quanti nickname
+vuole con un endpoint `fcm.googleapis.com` sintatticamente valido, e
+`dati-server/utenti.json` cresce senza tetto. Su un disco da 1 GB è un modo
+lento ma silenzioso di riempirlo. Un tetto non c'è ancora.
 
 ## Quando scrive
 
@@ -139,11 +223,19 @@ node server/prova-server.js   # API e pianificatore
 **Non provato qui:** la consegna vera. Chromium headless in questo ambiente non
 raggiunge il servizio push di Google (`Registration failed - permission
 denied`), quindi nessun messaggio è mai arrivato a un browser reale. Va
-verificato dove il server sarà ospitato:
+verificato una volta ospitato, ed è il primo comando da lanciare dopo il primo
+`fly deploy`:
 
 ```bash
-node server/prova-vera.js     # BASE=https://readda.tuodominio.it
+BASE=https://<nome>.fly.dev node server/prova-vera.js
 ```
 
 Si iscrive con un browser vero, manda un push e riporta cosa risponde il
-servizio. Una risposta `201` significa preso in carico.
+servizio. Una risposta `201` significa preso in carico. La prova cerca
+Chromium da sola: `CHROME=/percorso/al/chrome` se sta in un posto suo.
+
+**Non provata nemmeno la costruzione dell'immagine.** `Dockerfile` e
+`server/avvio.sh` sono scritti ma mai passati per un `docker build`: in questo
+ambiente il demone non gira. Provato invece l'insieme dei file che l'immagine
+copia, avviato da una cartella pulita — risponde su tutte le rotte dell'app e
+404 sui documenti di lavorazione.
