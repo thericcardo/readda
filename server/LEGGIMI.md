@@ -182,10 +182,36 @@ versione nuova:
 SERVIZI_PUSH=push.uno.example,push.due.example node server/server.js
 ```
 
-Quello che la lista **non** risolve: chiunque può registrare quanti nickname
-vuole con un endpoint `fcm.googleapis.com` sintatticamente valido, e
-`dati-server/utenti.json` cresce senza tetto. Su un disco da 1 GB è un modo
-lento ma silenzioso di riempirlo. Un tetto non c'è ancora.
+**Il tetto:** `MAX_ISCRITTI` (2000 di base). Senza, chiunque può registrare
+quanti nickname vuole con un endpoint `fcm.googleapis.com` sintatticamente
+valido, e `dati-server/utenti.json` cresce all'infinito.
+
+Un tetto *nudo* però sarebbe peggio del problema: chi vuole fare danno riempie
+i posti in pochi minuti, e da quel momento nessuna persona vera riesce più a
+iscriversi — da crescita lenta e visibile a blocco totale e immediato. Quindi
+prima di rifiutare il server **fa posto**, e sa dove guardare.
+
+La spazzatura ha una forma precisa: nessun promemoria mai partito, nessuna
+scadenza da aspettare, e nessuno che tocchi il record da `GIORNI_ABBANDONO`
+giorni (30 di base). Il perché sta in `server/scadenze.js`: il pianificatore
+non guarda mai un record senza scadenze mature, quindi non gli manda niente,
+quindi il servizio push non risponde mai 404, quindi non viene mai cancellato.
+Un record così è immortale, ed è l'unica forma che la spazzatura *può*
+prendere — uno *con* scadenze riceve un push, e se l'endpoint è finto il 404
+lo cancella da solo al primo giro.
+
+Cancellare un abbandonato non toglie niente a nessuno: chi riapre l'app si
+re-iscrive, il record rinasce e il gettone nuovo se lo prende da sé. È l'unica
+ragione per cui questa potatura si può fare senza chiedere permesso.
+
+La potatura gira a ogni passata del pianificatore, non solo quando l'archivio
+è pieno: un archivio che nessuno guarda non deve gonfiarsi lo stesso. E il
+tetto vale solo per i **nickname nuovi** — chi c'è già continua ad aggiornarsi
+anche a server pieno.
+
+Se dopo la potatura non c'è posto, la risposta è `503` e dice qual è il tetto:
+vuol dire che l'archivio è pieno di gente vera, e il numero è da alzare, non
+da difendere. Il server lo scrive anche nel registro.
 
 ## Quando scrive
 

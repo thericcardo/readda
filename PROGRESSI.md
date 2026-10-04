@@ -451,6 +451,19 @@ coordinamento sarebbe costato più del tempo risparmiato.
   endpoint `fcm.googleapis.com` sintatticamente valido e un nickname nuovo.
   Non verificato a runtime il ramo nuovo di `io.js`: serve un server vero più
   un browser con un servizio push raggiungibile, che qui non c'è.
+  Quarta passata, su richiesta: **il tetto dell'archivio**. La cosa da capire
+  non è il tetto ma il suo modo di fallire — un tetto nudo trasforma una
+  crescita lenta e visibile in un blocco totale e immediato, perché basta
+  riempire i posti per chiudere fuori tutti. Dimostrato, non supposto:
+  togliendo la potatura, una persona vera prende **503** mentre due record
+  finti tengono i due posti. Quindi prima si fa posto, e la spazzatura si
+  riconosce da una forma sola — mai svegliato, senza scadenze, fermo da 30
+  giorni — che è l'unica che può prendere, perché un record con scadenze
+  riceve un push e il 404 lo cancella da solo. Cancellare un abbandonato non
+  toglie niente: chi riapre l'app si re-iscrive e il record rinasce. Una delle
+  prove nuove era sbagliata e l'ha detto il codice: ri-iscriversi senza
+  gettone è 403 per la protezione anti-dirottamento, che viene prima del
+  tetto. Corretta passando il gettone, così prova quello che dichiara.
   Le due suite del server sono agganciate a `npm test`, e la corsa 9 della
   CI — innescata dalla spinta diretta sul ramo predefinito, che è il caso per
   cui il filtro `on: push` esiste — è passata verde.

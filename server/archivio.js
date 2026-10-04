@@ -74,6 +74,10 @@ Archivio.prototype.dimentica = function (nick) {
   this.sporca();
 };
 
+Archivio.prototype.quanti = function () {
+  return Object.keys(this.dati.utenti).length;
+};
+
 Archivio.prototype.tutti = function () {
   return Object.keys(this.dati.utenti).map((k) => this.dati.utenti[k]);
 };

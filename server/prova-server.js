@@ -239,6 +239,97 @@ const ISCRIZIONE = {
    * scriverlo e saltare il limite del tutto - quindi l'intestazione si guarda
    * solo quando lo dice una variabile d'ambiente, che il cliente non puo'
    * toccare. */
+  /* ------------------------------------------------ il tetto dell'archivio
+   * Senza tetto l'archivio cresce all'infinito: basta un endpoint
+   * fcm.googleapis.com sintatticamente valido e un nickname mai visto.
+   *
+   * Ma un tetto nudo sarebbe peggio del problema. Chi vuole fare danno
+   * riempie i posti in pochi minuti, e da quel momento nessuna persona vera
+   * riesce piu' a iscriversi: da crescita lenta e visibile a blocco totale e
+   * immediato. Serve quindi distinguere la spazzatura da una persona, e la
+   * forma che la spazzatura prende e' precisa - vedi `abbandonato`. */
+  gruppo('Chi e\' abbandonato e chi no');
+  const GIORNO = 24 * 36e5;
+  const ora = Date.UTC(2026, 5, 1, 12, 0);
+  const vuoto = (patch) => Object.assign(
+    { nick: 'X', iscrizione: ISCRIZIONE, scadenze: [], aggiornato: ora - 40 * GIORNO }, patch);
+
+  p('mai svegliato, senza scadenze, fermo da 40 giorni',
+    Scadenze.abbandonato(vuoto(), ora, 30) === true);
+  p('toccato ieri non e\' abbandonato',
+    Scadenze.abbandonato(vuoto({ aggiornato: ora - GIORNO }), ora, 30) === false);
+  /* Con una scadenza il pianificatore lo guarda, gli manda un push, e se
+   * l'endpoint e' finto il 404 lo cancella da solo: non tocca a questa
+   * potatura. */
+  p('con una scadenza da aspettare non e\' abbandonato',
+    Scadenze.abbandonato(
+      vuoto({ scadenze: [{ quando: ora, lemma: 'x', tipo: 'produzione' }] }), ora, 30) === false);
+  p('chi ha gia\' ricevuto un promemoria non e\' abbandonato',
+    Scadenze.abbandonato(vuoto({ ultimoInvio: ora - 40 * GIORNO }), ora, 30) === false);
+
+  gruppo('Il tetto dell\'archivio');
+  const conTetto = (opz) => avvia(Object.assign({
+    porta: 0,
+    chiavi: Push.generaChiavi(),
+    senzaTimer: true,
+    dietroProxy: true,
+    invia: async () => ({ stato: 201 }),
+  }, opz));
+
+  /* dietroProxy + un indirizzo finto diverso: ogni istanza ha il suo secchio
+   * del limite di frequenza, e queste prove non spendono quello condiviso. */
+  const iscriviSu = (base, finto, nick, gett) => fetch(base + '/api/iscrizione', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', 'Fly-Client-IP': finto },
+    body: JSON.stringify({ nick: nick, iscrizione: ISCRIZIONE, gettone: gett }),
+  });
+
+  const pieno = conTetto({ archivio: path.join(tmp, 'utenti-tetto.json'), maxIscritti: 2 });
+  const basePieno = 'http://127.0.0.1:' + (await pieno.apri());
+  const primo = await iscriviSu(basePieno, '198.51.100.10', 'Uno');
+  p('il primo entra', primo.status === 200);
+  const gettonePrimo = (await primo.json()).gettone;
+  p('il secondo entra', (await iscriviSu(basePieno, '198.51.100.10', 'Due')).status === 200);
+  const terzo = await iscriviSu(basePieno, '198.51.100.10', 'Tre');
+  const dettoTerzo = await terzo.json();
+  p('il terzo trova il server al completo', terzo.status === 503, terzo.status);
+  p('e il rifiuto dice qual e\' il tetto',
+    typeof dettoTerzo.errore === 'string' && dettoTerzo.errore.indexOf('2') !== -1, dettoTerzo);
+  /* Chi c'e' gia' non resta chiuso fuori dal tetto: aggiornarsi non e'
+   * iscriversi. Col gettone, perche' senza sarebbe 403 per la protezione
+   * contro chi indovina un nickname - che e' un'altra cosa e viene prima. */
+  p('chi e\' gia\' dentro continua ad aggiornarsi ad archivio pieno',
+    (await iscriviSu(basePieno, '198.51.100.10', 'Uno', gettonePrimo)).status === 200);
+  await pieno.chiudi();
+
+  /* La prova che dice se il disegno vale qualcosa: con due posti occupati da
+   * record abbandonati, una persona vera deve entrare lo stesso. Con un tetto
+   * nudo qui ci sarebbe un 503. */
+  const conSpazzatura = conTetto({ archivio: path.join(tmp, 'utenti-spazzatura.json'), maxIscritti: 2 });
+  const baseSpazz = 'http://127.0.0.1:' + (await conSpazzatura.apri());
+  await iscriviSu(baseSpazz, '198.51.100.11', 'Finto1');
+  await iscriviSu(baseSpazz, '198.51.100.11', 'Finto2');
+  for (const u of conSpazzatura.archivio.tutti()) u.aggiornato = Date.now() - 40 * GIORNO;
+  const vera = await iscriviSu(baseSpazz, '198.51.100.11', 'Persona');
+  p('un posto occupato da spazzatura si libera per una persona vera',
+    vera.status === 200, vera.status);
+  p('e la spazzatura e\' sparita davvero',
+    !conSpazzatura.archivio.utente('Finto1') && !conSpazzatura.archivio.utente('Finto2'),
+    conSpazzatura.archivio.tutti().map((u) => u.nick));
+  await conSpazzatura.chiudi();
+
+  /* Il giro periodico fa la stessa pulizia senza aspettare che qualcuno si
+   * iscriva: un archivio che nessuno guarda non deve gonfiarsi lo stesso. */
+  const conGiro = conTetto({ archivio: path.join(tmp, 'utenti-giro.json') });
+  const baseGiro = 'http://127.0.0.1:' + (await conGiro.apri());
+  await iscriviSu(baseGiro, '198.51.100.12', 'Vecchio');
+  await iscriviSu(baseGiro, '198.51.100.12', 'Nuovo');
+  conGiro.archivio.utente('Vecchio').aggiornato = Date.now() - 40 * GIORNO;
+  await conGiro.giro(Date.now());
+  p('il giro toglie l\'abbandonato', !conGiro.archivio.utente('Vecchio'));
+  p('e lascia stare chi e\' arrivato adesso', !!conGiro.archivio.utente('Nuovo'));
+  await conGiro.chiudi();
+
   gruppo('Limite di frequenza dietro un proxy');
   const dietro = avvia({
     porta: 0,

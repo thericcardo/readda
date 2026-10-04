@@ -228,6 +228,20 @@ function avvia(opzioni) {
     : !!(process.env.FLY_APP_NAME || process.env.DIETRO_PROXY);
   const servizi = opzioni.servizi || String(process.env.SERVIZI_PUSH || '')
     .split(',').map((s) => s.trim()).filter(Boolean);
+  const maxIscritti = opzioni.maxIscritti
+    || parseInt(process.env.MAX_ISCRITTI || '2000', 10);
+  const giorniAbbandono = opzioni.giorniAbbandono
+    || parseInt(process.env.GIORNI_ABBANDONO || '', 10) || Scadenze.GIORNI_ABBANDONO;
+
+  /* Toglie i record abbandonati. Costa un giro su qualche migliaio di oggetti,
+   * quindi si puo' chiamare a ogni passata del pianificatore senza pensarci. */
+  function potaAbbandonati(adesso) {
+    let tolti = 0;
+    for (const u of archivio.tutti()) {
+      if (Scadenze.abbandonato(u, adesso, giorniAbbandono)) { archivio.dimentica(u.nick); tolti++; }
+    }
+    return tolti;
+  }
 
   const server = http.createServer(async (req, res) => {
     const via = url.parse(req.url).pathname;
@@ -273,6 +287,27 @@ function avvia(opzioni) {
           rispondi(res, 403, { errore: 'questo nickname e\' gia\' iscritto da un altro dispositivo' });
           return;
         }
+        /* Il tetto. Da solo sarebbe peggio del problema che risolve: chi
+         * vuole fare danno riempie i posti in pochi minuti e da quel momento
+         * nessuna persona vera riesce piu' a iscriversi - da crescita lenta e
+         * visibile a blocco totale e immediato. Quindi prima si fa posto
+         * buttando i record abbandonati, che e' la forma che la spazzatura
+         * prende per forza (vedi Scadenze.abbandonato), e si rifiuta solo se
+         * non ce n'e' nemmeno uno: allora l'archivio e' pieno di gente vera e
+         * il tetto e' da alzare, non da difendere.
+         *
+         * Vale solo per i nickname nuovi: chi c'e' gia' deve poter continuare
+         * ad aggiornarsi anche ad archivio pieno. */
+        if (!esistente && archivio.quanti() >= maxIscritti) {
+          potaAbbandonati(Date.now());
+          if (archivio.quanti() >= maxIscritti) {
+            console.warn('[readda] archivio al completo: ' + archivio.quanti()
+              + ' iscritti, nessuno abbandonato da togliere. Alza MAX_ISCRITTI.');
+            rispondi(res, 503, { errore: 'il server e\' al completo: '
+              + maxIscritti + ' iscritti, e nessun posto da liberare' });
+            return;
+          }
+        }
         const u = archivio.iscrivi(nick, c.iscrizione);
         if (typeof c.fuso === 'number' && Math.abs(c.fuso) <= 900) u.fuso = c.fuso;
         if (Array.isArray(c.scadenze) && !scadenzeValide(c.scadenze)) {
@@ -315,6 +350,10 @@ function avvia(opzioni) {
   /* --------------------------------------------------- il pianificatore */
   async function giro(adesso) {
     adesso = adesso || Date.now();
+    // la potatura sta qui e non solo sotto il tetto: un archivio che nessuno
+    // guarda non deve gonfiarsi lo stesso, aspettando un'iscrizione che non
+    // arriva
+    const abbandonati = potaAbbandonati(adesso);
     let mandati = 0, scadute = 0;
     for (const u of archivio.tutti()) {
       const m = Scadenze.daSvegliare(u, adesso);
@@ -336,7 +375,7 @@ function avvia(opzioni) {
         // una rete che cade non deve fermare il giro per tutti gli altri
       }
     }
-    return { mandati, scadute };
+    return { mandati, scadute, abbandonati };
   }
 
   let timer = null;
