@@ -118,6 +118,9 @@ iscrizione è l'unica cosa che impedisce a chi indovini un nickname di dirottarn
 i promemoria.
 
 Messa in esercizio, rotte e regole in [server/LEGGIMI.md](server/LEGGIMI.md).
+`Dockerfile` e `fly.toml` sono nel repository: l'immagine copia i file
+dell'app e non il repository intero, così il diario di lavorazione e le
+schermate non finiscono su un indirizzo pubblico.
 
 ## Le prove
 
@@ -351,8 +354,13 @@ contano.
 ## Limiti, detti chiaramente
 
 1. **Le notifiche ad app chiusa richiedono che qualcuno tenga acceso il server.**
-   `server/server.js` c'è e funziona, ma va ospitato su un dominio con HTTPS.
-   Senza, l'app ripiega sul controllo a scheda aperta.
+   `server/server.js` c'è e funziona; `Dockerfile` e `fly.toml` lo mettono in
+   esercizio con un comando, su un indirizzo HTTPS. Restano due condizioni che
+   nessuna configurazione può togliere: la macchina dev'essere **accesa**, non
+   sospesa quando nessuno naviga — il pianificatore gira ogni 60 secondi — e
+   l'app va aperta **da quell'indirizzo**, perché dentro l'artefatto di
+   claude.ai i service worker non girano e il push non può partire.
+   Senza server, l'app ripiega sul controllo a scheda aperta.
    La **consegna vera non è verificata**: Chromium headless in questo ambiente
    non raggiunge il servizio push di Google, quindi nessun messaggio è mai
    arrivato a un browser reale. La cifratura sì: produce esattamente il corpo
@@ -374,8 +382,11 @@ contano.
 
 ## Passi successivi, in ordine di resa
 
-1. ~~Server per Web Push~~ — fatto. Resta da **ospitarlo** e verificare lì la
-   consegna: è ancora ciò che trasforma i promemoria da promessa a funzione.
+1. ~~Server per Web Push~~ — fatto. ~~Configurazione per ospitarlo~~ — fatta:
+   `Dockerfile` e `fly.toml`, con le istruzioni in
+   [server/LEGGIMI.md](server/LEGGIMI.md). Resta da lanciare il `fly deploy` e
+   verificare lì la **consegna vera** con `npm run test:consegna`: è ancora
+   quella che trasforma i promemoria da promessa a funzione.
 2. Riscrivere a mano le definizioni più goffe, partendo da quelle che compaiono
    di più: ogni voce riscritta esce dal vincolo CC BY-SA.
 3. Valutazione automatica delle frasi scritte: da «contiene la parola» a «la usa bene».

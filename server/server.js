@@ -72,6 +72,19 @@ function serviFile(percorsoRichiesto, res) {
     res.writeHead(403).end('vietato');
     return;
   }
+  // E niente dati-server/, che invece sta DENTRO la radice: il controllo qui
+  // sopra vieta solo di uscirne, quindi lasciava servire chiavi.json - la
+  // chiave privata VAPID - e utenti.json, con endpoint, chiavi e gettone di
+  // ogni iscritto. Con quei due file chiunque puo' firmare messaggi a nome
+  // del server e scrivere a tutti gli iscritti. Su localhost non si vedeva;
+  // dal momento in cui il server e' ospitato basta conoscere il percorso.
+  // Stessa riga tiene fuori server/: il sorgente e' su GitHub, ma non ha
+  // niente da fare fra i file che l'app serve.
+  if (assoluto === DATI || assoluto.startsWith(DATI + path.sep) ||
+      assoluto.startsWith(path.join(RADICE, 'server') + path.sep)) {
+    res.writeHead(403).end('vietato');
+    return;
+  }
   fs.readFile(assoluto, (err, corpo) => {
     if (err) { res.writeHead(404, { 'Content-Type': 'text/plain' }).end('non trovato'); return; }
     const est = path.extname(assoluto).toLowerCase();
@@ -108,7 +121,44 @@ function rispondi(res, stato, oggetto) {
   res.end(corpo);
 }
 
-function iscrizioneValida(i) {
+/* I servizi push dei browser veri.
+ *
+ * Senza questa lista l'endpoint poteva essere qualunque indirizzo https: il
+ * pianificatore avrebbe fatto richieste in uscita verso host scelti da chi si
+ * iscrive.
+ *
+ * Una lista di host ammessi prima o poi sbaglia, perche' i browser ne
+ * aggiungono. La scelta non e' se sbagliare, ma come: rifiutare dicendo quale
+ * host era si vede subito - lo legge chi si iscrive e finisce nel registro del
+ * server - mentre accettare e non consegnare mai non lo scopre nessuno, ed e'
+ * il guasto peggiore possibile per un'app di promemoria.
+ *
+ * Un elemento che comincia per punto vale per tutti i sottodomini, e solo per
+ * quelli: `.push.services.mozilla.com` prende
+ * `updates.push.services.mozilla.com` e non `xpush.services.mozilla.com`.
+ *
+ * Per allungarla senza aspettare una versione nuova:
+ *   SERVIZI_PUSH=push.uno.example,push.due.example
+ */
+const SERVIZI = [
+  'fcm.googleapis.com',          // Chrome, Edge, Opera, Brave, Samsung
+  'android.googleapis.com',      // Chrome vecchio, rotta gcm/send
+  'web.push.apple.com',          // Safari
+  '.push.services.mozilla.com',  // Firefox
+  '.notify.windows.com',         // Edge prima di Chromium
+];
+
+function servizioNoto(host, extra) {
+  return SERVIZI.concat(extra || []).some((s) => (s.charAt(0) === '.'
+    ? host.length > s.length && host.slice(-s.length) === s
+    : host === s));
+}
+
+/* Il controllo sull'host viene per ultimo di proposito: un endpoint con le
+ * chiavi sbagliate deve continuare a essere rifiutato per le chiavi, non per
+ * l'host, altrimenti la prova che dice «rifiuta chiavi di lunghezza
+ * sbagliata» passerebbe senza piu' guardare le chiavi. */
+function iscrizioneValida(i, servizi) {
   if (!i || typeof i.endpoint !== 'string') return 'iscrizione senza endpoint';
   let u;
   try { u = new URL(i.endpoint); } catch (e) { return 'endpoint non e\' un indirizzo'; }
@@ -120,6 +170,7 @@ function iscrizioneValida(i) {
     if (Push.dab64u(i.keys.p256dh).length !== 65) return 'chiave p256dh di lunghezza sbagliata';
     if (Push.dab64u(i.keys.auth).length !== 16) return 'segreto auth di lunghezza sbagliata';
   } catch (e) { return 'chiavi non decodificabili'; }
+  if (!servizioNoto(u.host, servizi)) return 'servizio push sconosciuto: ' + u.host;
   return null;
 }
 
@@ -135,6 +186,26 @@ function scadenzeValide(s) {
 }
 
 /* ------------------------------------------------- limite di frequenza */
+
+/* Dietro un proxy, `req.socket.remoteAddress` e' l'indirizzo del proxy:
+ * uguale per tutti. Il limite diventerebbe uno solo per il mondo intero, e
+ * una persona rumorosa chiuderebbe fuori tutte le altre.
+ *
+ * Fidarsi di X-Forwarded-For a scatola chiusa sarebbe pero' peggio del
+ * problema: chiunque puo' scriversi quell'intestazione e cambiarla a ogni
+ * richiesta, saltando il limite del tutto. Quindi la si guarda solo quando lo
+ * dice una variabile d'ambiente - che il cliente non puo' toccare. Su Fly,
+ * FLY_APP_NAME la mette la piattaforma da se'. */
+function indirizzo(req, dietroProxy) {
+  if (dietroProxy) {
+    const suo = req.headers['fly-client-ip'];
+    if (suo) return String(suo).trim();
+    const inoltrato = req.headers['x-forwarded-for'];
+    if (inoltrato) return String(inoltrato).split(',')[0].trim();
+  }
+  return req.socket.remoteAddress || '?';
+}
+
 const colpi = new Map();
 function troppiTentativi(ip) {
   const adesso = Date.now();
@@ -153,10 +224,28 @@ function avvia(opzioni) {
   const archivio = new Archivio(opzioni.archivio || path.join(DATI, 'utenti.json'));
   const inviaPush = opzioni.invia || ((iscr, testo) =>
     Push.invia(iscr, testo, chiavi, { soggetto: SOGGETTO, ttl: 6 * 3600 }));
+  const dietroProxy = opzioni.dietroProxy !== undefined ? opzioni.dietroProxy
+    : !!(process.env.FLY_APP_NAME || process.env.DIETRO_PROXY);
+  const servizi = opzioni.servizi || String(process.env.SERVIZI_PUSH || '')
+    .split(',').map((s) => s.trim()).filter(Boolean);
+  const maxIscritti = opzioni.maxIscritti
+    || parseInt(process.env.MAX_ISCRITTI || '2000', 10);
+  const giorniAbbandono = opzioni.giorniAbbandono
+    || parseInt(process.env.GIORNI_ABBANDONO || '', 10) || Scadenze.GIORNI_ABBANDONO;
+
+  /* Toglie i record abbandonati. Costa un giro su qualche migliaio di oggetti,
+   * quindi si puo' chiamare a ogni passata del pianificatore senza pensarci. */
+  function potaAbbandonati(adesso) {
+    let tolti = 0;
+    for (const u of archivio.tutti()) {
+      if (Scadenze.abbandonato(u, adesso, giorniAbbandono)) { archivio.dimentica(u.nick); tolti++; }
+    }
+    return tolti;
+  }
 
   const server = http.createServer(async (req, res) => {
     const via = url.parse(req.url).pathname;
-    const ip = req.socket.remoteAddress || '?';
+    const ip = indirizzo(req, dietroProxy);
 
     res.setHeader('X-Content-Type-Options', 'nosniff');
     res.setHeader('Referrer-Policy', 'no-referrer');
@@ -179,8 +268,17 @@ function avvia(opzioni) {
         const c = await leggiCorpo(req);
         const nick = String(c.nick || '').trim();
         if (!nick || nick.length > 24) { rispondi(res, 400, { errore: 'nickname non valido' }); return; }
-        const guaio = iscrizioneValida(c.iscrizione);
-        if (guaio) { rispondi(res, 400, { errore: guaio }); return; }
+        const guaio = iscrizioneValida(c.iscrizione, servizi);
+        if (guaio) {
+          // un servizio push che non conosciamo e' l'unico rifiuto che puo'
+          // essere colpa della lista e non di chi si iscrive: va visto
+          if (guaio.indexOf('servizio push sconosciuto') === 0) {
+            console.warn('[readda] ' + guaio + ' - se e\' un browser vero, '
+              + 'aggiungilo con SERVIZI_PUSH nell\'ambiente');
+          }
+          rispondi(res, 400, { errore: guaio });
+          return;
+        }
 
         const esistente = archivio.utente(nick);
         // chi c'e' gia' deve dimostrare di essere lo stesso, altrimenti
@@ -188,6 +286,27 @@ function avvia(opzioni) {
         if (esistente && c.gettone !== esistente.gettone) {
           rispondi(res, 403, { errore: 'questo nickname e\' gia\' iscritto da un altro dispositivo' });
           return;
+        }
+        /* Il tetto. Da solo sarebbe peggio del problema che risolve: chi
+         * vuole fare danno riempie i posti in pochi minuti e da quel momento
+         * nessuna persona vera riesce piu' a iscriversi - da crescita lenta e
+         * visibile a blocco totale e immediato. Quindi prima si fa posto
+         * buttando i record abbandonati, che e' la forma che la spazzatura
+         * prende per forza (vedi Scadenze.abbandonato), e si rifiuta solo se
+         * non ce n'e' nemmeno uno: allora l'archivio e' pieno di gente vera e
+         * il tetto e' da alzare, non da difendere.
+         *
+         * Vale solo per i nickname nuovi: chi c'e' gia' deve poter continuare
+         * ad aggiornarsi anche ad archivio pieno. */
+        if (!esistente && archivio.quanti() >= maxIscritti) {
+          potaAbbandonati(Date.now());
+          if (archivio.quanti() >= maxIscritti) {
+            console.warn('[readda] archivio al completo: ' + archivio.quanti()
+              + ' iscritti, nessuno abbandonato da togliere. Alza MAX_ISCRITTI.');
+            rispondi(res, 503, { errore: 'il server e\' al completo: '
+              + maxIscritti + ' iscritti, e nessun posto da liberare' });
+            return;
+          }
         }
         const u = archivio.iscrivi(nick, c.iscrizione);
         if (typeof c.fuso === 'number' && Math.abs(c.fuso) <= 900) u.fuso = c.fuso;
@@ -231,6 +350,10 @@ function avvia(opzioni) {
   /* --------------------------------------------------- il pianificatore */
   async function giro(adesso) {
     adesso = adesso || Date.now();
+    // la potatura sta qui e non solo sotto il tetto: un archivio che nessuno
+    // guarda non deve gonfiarsi lo stesso, aspettando un'iscrizione che non
+    // arriva
+    const abbandonati = potaAbbandonati(adesso);
     let mandati = 0, scadute = 0;
     for (const u of archivio.tutti()) {
       const m = Scadenze.daSvegliare(u, adesso);
@@ -252,7 +375,7 @@ function avvia(opzioni) {
         // una rete che cade non deve fermare il giro per tutti gli altri
       }
     }
-    return { mandati, scadute };
+    return { mandati, scadute, abbandonati };
   }
 
   let timer = null;

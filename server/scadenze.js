@@ -60,6 +60,31 @@ function daSvegliare(utente, adesso) {
   };
 }
 
+const GIORNI_ABBANDONO = 30;   // quanto resta in piedi un record che non serve a niente
+
+/* Un record abbandonato: nessun promemoria gli e' mai partito, non ha scadenze
+ * da aspettare, e nessuno lo tocca da GIORNI_ABBANDONO giorni.
+ *
+ * I tre pezzi servono tutti, e il primo e' il piu' importante da capire. Il
+ * pianificatore non guarda mai un record senza scadenze mature: non gli manda
+ * niente, quindi il servizio push non risponde mai 404, quindi non viene mai
+ * cancellato. Un record cosi' e' immortale - ed e' esattamente la forma che
+ * prende la spazzatura, perche' per crearne uno basta un endpoint
+ * sintatticamente valido e un nickname mai visto. Un record *con* scadenze
+ * invece un push lo riceve, e se l'endpoint e' finto il 404 lo cancella da
+ * solo al primo giro: quello non e' affare di questa potatura.
+ *
+ * Cancellarlo non toglie niente a nessuno, ed e' l'unica ragione per cui si
+ * puo' fare senza chiedere il permesso a chi la subisce: chi riapre l'app si
+ * re-iscrive, il record rinasce e il gettone nuovo se lo prende da se'. */
+function abbandonato(u, adesso, giorni) {
+  if (!u) return false;
+  if (u.ultimoInvio) return false;
+  if (u.scadenze && u.scadenze.length) return false;
+  const limite = (giorni || GIORNI_ABBANDONO) * 24 * ORE;
+  return (adesso || Date.now()) - (u.aggiornato || u.creato || 0) > limite;
+}
+
 /* Voci da ripulire: gia' passate da troppo tempo, non torneranno utili. */
 function potaScadenze(scadenze, adesso) {
   adesso = adesso || Date.now();
@@ -67,6 +92,7 @@ function potaScadenze(scadenze, adesso) {
 }
 
 module.exports = {
-  daSvegliare, potaScadenze, dentroLaFinestra, oraLocale,
+  daSvegliare, potaScadenze, dentroLaFinestra, oraLocale, abbandonato,
   DISTANZA_MINIMA, FINESTRA_INIZIO, FINESTRA_FINE, RITARDO_MASSIMO,
+  GIORNI_ABBANDONO,
 };

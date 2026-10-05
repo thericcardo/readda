@@ -59,6 +59,34 @@ const ISCRIZIONE = {
   const fuga = await fetch(base + '/../../etc/passwd');
   p('non si esce dalla cartella del progetto', fuga.status === 404 || fuga.status === 403, fuga.status);
 
+  /* dati-server/ sta DENTRO la radice del progetto, quindi la guardia qui
+   * sopra - che vieta solo di uscirne - non lo fermava: chiavi.json con la
+   * chiave privata VAPID e utenti.json con endpoint, chiavi e gettoni di ogni
+   * iscritto erano leggibili da chiunque conoscesse il percorso. Su localhost
+   * non si vedeva; ospitato, bastava chiederlo.
+   *
+   * L'asserzione e' su 403 e non su «diverso da 200» apposta: senza guardia
+   * un file assente risponde 404, e una prova contenta del 404 passerebbe
+   * anche col difetto dentro. Per questo ce n'e' anche una su un file che
+   * esiste davvero. */
+  const spia = path.join(path.dirname(__dirname), 'dati-server', 'prova-spia.json');
+  fs.mkdirSync(path.dirname(spia), { recursive: true });
+  fs.writeFileSync(spia, '{"privata":"non-deve-uscire"}');
+  try {
+    const chiavi = await fetch(base + '/dati-server/chiavi.json');
+    p('la chiave privata non e\' servita', chiavi.status === 403, chiavi.status);
+    const utenti = await fetch(base + '/dati-server/utenti.json');
+    p('l\'archivio degli iscritti non e\' servito', utenti.status === 403, utenti.status);
+    const vista = await fetch(base + '/dati-server/prova-spia.json');
+    const corpo = await vista.text();
+    p('nemmeno un file di dati-server che esiste davvero',
+      vista.status === 403 && corpo.indexOf('non-deve-uscire') === -1, vista.status);
+    const sorgente = await fetch(base + '/server/server.js');
+    p('il sorgente del server non e\' fra i file dell\'app', sorgente.status === 403, sorgente.status);
+  } finally {
+    fs.rmSync(spia, { force: true });
+  }
+
   gruppo('Chiave pubblica');
   const k = await chiama('/api/chiave', 'GET');
   p('restituisce la chiave VAPID', k.stato === 200 && Push.dab64u(k.dati.chiave).length === 65);
@@ -79,6 +107,54 @@ const ISCRIZIONE = {
   p('senza gettone non si dirotta un nickname gia\' iscritto', r.stato === 403, r.dati);
   r = await chiama('/api/iscrizione', 'POST', { nick: 'ric', iscrizione: ISCRIZIONE, gettone: gettone });
   p('col gettone giusto si puo\' riaggiornare', r.stato === 200);
+
+  /* La lista dei servizi push. Una lista di host ammessi prima o poi sbaglia,
+   * perche' i browser ne aggiungono: la scelta non e' se sbagliare, ma come.
+   * Rifiutare dicendo quale host era si vede subito - lo legge chi si iscrive
+   * e lo scrive il registro del server; accettare e non consegnare mai non lo
+   * scopre nessuno, ed e' il guasto peggiore per un'app di promemoria. */
+  let quanti = 0;
+  const conEndpoint = (e) => ({ nick: 'Servizio' + (++quanti),
+                                iscrizione: { endpoint: e, keys: ISCRIZIONE.keys } });
+  for (const [nome, e] of [
+    ['Chrome, Edge, Opera, Samsung', 'https://fcm.googleapis.com/fcm/send/abc'],
+    ['Firefox', 'https://updates.push.services.mozilla.com/wpush/v2/abc'],
+    ['Safari', 'https://web.push.apple.com/abc'],
+    ['Edge EdgeHTML', 'https://wns2-by3p.notify.windows.com/w/?token=abc'],
+  ]) {
+    const rs = await chiama('/api/iscrizione', 'POST', conEndpoint(e));
+    p('accetta il servizio push di ' + nome, rs.stato === 200, rs.dati);
+  }
+
+  /* Il confine dei sottodomini: `.push.services.mozilla.com` deve prendere
+   * updates.push.services.mozilla.com e NON xpush.services.mozilla.com, che e'
+   * un dominio di qualcun altro con lo stesso finale. */
+  r = await chiama('/api/iscrizione', 'POST', conEndpoint('https://xpush.services.mozilla.com/abc'));
+  p('un suffisso non basta: serve il confine di etichetta', r.stato === 400, r.dati);
+
+  r = await chiama('/api/iscrizione', 'POST', conEndpoint('https://un-host-qualunque.example/xyz'));
+  p('rifiuta un host che non e\' un servizio push', r.stato === 400, r.dati);
+  p('e dice quale host era, cosi\' si puo\' aggiungere',
+    !!r.dati && typeof r.dati.errore === 'string'
+    && r.dati.errore.indexOf('un-host-qualunque.example') !== -1, r.dati);
+
+  /* L'appiglio: la lista invecchia, e chi ospita deve poterla allungare senza
+   * aspettare una versione nuova. */
+  const conExtra = avvia({
+    porta: 0,
+    archivio: path.join(tmp, 'utenti-extra.json'),
+    chiavi: Push.generaChiavi(),
+    senzaTimer: true,
+    servizi: ['push.mio.example'],
+    invia: async () => ({ stato: 201 }),
+  });
+  const portaE = await conExtra.apri();
+  const rx = await fetch('http://127.0.0.1:' + portaE + '/api/iscrizione', {
+    method: 'POST', headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(conEndpoint('https://push.mio.example/abc')),
+  });
+  p('un servizio in piu\' si aggiunge senza toccare il codice', rx.status === 200, rx.status);
+  await conExtra.chiudi();
 
   gruppo('Scadenze');
   const ieri = Date.now() - 36e5;
@@ -156,6 +232,128 @@ const ISCRIZIONE = {
   r = await chiama('/api/iscrizione', 'DELETE', { nick: 'Altro', gettone: g2 });
   p('col gettone si cancella', r.stato === 200 && !app.archivio.utente('Altro'));
 
+  /* Dietro un proxy, req.socket.remoteAddress e' l'indirizzo del proxy:
+   * uguale per tutti, quindi il limite diventerebbe uno solo per il mondo
+   * intero e una persona rumorosa chiuderebbe fuori le altre. Fidarsi di
+   * X-Forwarded-For a scatola chiusa sarebbe pero' peggio - chiunque puo'
+   * scriverlo e saltare il limite del tutto - quindi l'intestazione si guarda
+   * solo quando lo dice una variabile d'ambiente, che il cliente non puo'
+   * toccare. */
+  /* ------------------------------------------------ il tetto dell'archivio
+   * Senza tetto l'archivio cresce all'infinito: basta un endpoint
+   * fcm.googleapis.com sintatticamente valido e un nickname mai visto.
+   *
+   * Ma un tetto nudo sarebbe peggio del problema. Chi vuole fare danno
+   * riempie i posti in pochi minuti, e da quel momento nessuna persona vera
+   * riesce piu' a iscriversi: da crescita lenta e visibile a blocco totale e
+   * immediato. Serve quindi distinguere la spazzatura da una persona, e la
+   * forma che la spazzatura prende e' precisa - vedi `abbandonato`. */
+  gruppo('Chi e\' abbandonato e chi no');
+  const GIORNO = 24 * 36e5;
+  const ora = Date.UTC(2026, 5, 1, 12, 0);
+  const vuoto = (patch) => Object.assign(
+    { nick: 'X', iscrizione: ISCRIZIONE, scadenze: [], aggiornato: ora - 40 * GIORNO }, patch);
+
+  p('mai svegliato, senza scadenze, fermo da 40 giorni',
+    Scadenze.abbandonato(vuoto(), ora, 30) === true);
+  p('toccato ieri non e\' abbandonato',
+    Scadenze.abbandonato(vuoto({ aggiornato: ora - GIORNO }), ora, 30) === false);
+  /* Con una scadenza il pianificatore lo guarda, gli manda un push, e se
+   * l'endpoint e' finto il 404 lo cancella da solo: non tocca a questa
+   * potatura. */
+  p('con una scadenza da aspettare non e\' abbandonato',
+    Scadenze.abbandonato(
+      vuoto({ scadenze: [{ quando: ora, lemma: 'x', tipo: 'produzione' }] }), ora, 30) === false);
+  p('chi ha gia\' ricevuto un promemoria non e\' abbandonato',
+    Scadenze.abbandonato(vuoto({ ultimoInvio: ora - 40 * GIORNO }), ora, 30) === false);
+
+  gruppo('Il tetto dell\'archivio');
+  const conTetto = (opz) => avvia(Object.assign({
+    porta: 0,
+    chiavi: Push.generaChiavi(),
+    senzaTimer: true,
+    dietroProxy: true,
+    invia: async () => ({ stato: 201 }),
+  }, opz));
+
+  /* dietroProxy + un indirizzo finto diverso: ogni istanza ha il suo secchio
+   * del limite di frequenza, e queste prove non spendono quello condiviso. */
+  const iscriviSu = (base, finto, nick, gett) => fetch(base + '/api/iscrizione', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', 'Fly-Client-IP': finto },
+    body: JSON.stringify({ nick: nick, iscrizione: ISCRIZIONE, gettone: gett }),
+  });
+
+  const pieno = conTetto({ archivio: path.join(tmp, 'utenti-tetto.json'), maxIscritti: 2 });
+  const basePieno = 'http://127.0.0.1:' + (await pieno.apri());
+  const primo = await iscriviSu(basePieno, '198.51.100.10', 'Uno');
+  p('il primo entra', primo.status === 200);
+  const gettonePrimo = (await primo.json()).gettone;
+  p('il secondo entra', (await iscriviSu(basePieno, '198.51.100.10', 'Due')).status === 200);
+  const terzo = await iscriviSu(basePieno, '198.51.100.10', 'Tre');
+  const dettoTerzo = await terzo.json();
+  p('il terzo trova il server al completo', terzo.status === 503, terzo.status);
+  p('e il rifiuto dice qual e\' il tetto',
+    typeof dettoTerzo.errore === 'string' && dettoTerzo.errore.indexOf('2') !== -1, dettoTerzo);
+  /* Chi c'e' gia' non resta chiuso fuori dal tetto: aggiornarsi non e'
+   * iscriversi. Col gettone, perche' senza sarebbe 403 per la protezione
+   * contro chi indovina un nickname - che e' un'altra cosa e viene prima. */
+  p('chi e\' gia\' dentro continua ad aggiornarsi ad archivio pieno',
+    (await iscriviSu(basePieno, '198.51.100.10', 'Uno', gettonePrimo)).status === 200);
+  await pieno.chiudi();
+
+  /* La prova che dice se il disegno vale qualcosa: con due posti occupati da
+   * record abbandonati, una persona vera deve entrare lo stesso. Con un tetto
+   * nudo qui ci sarebbe un 503. */
+  const conSpazzatura = conTetto({ archivio: path.join(tmp, 'utenti-spazzatura.json'), maxIscritti: 2 });
+  const baseSpazz = 'http://127.0.0.1:' + (await conSpazzatura.apri());
+  await iscriviSu(baseSpazz, '198.51.100.11', 'Finto1');
+  await iscriviSu(baseSpazz, '198.51.100.11', 'Finto2');
+  for (const u of conSpazzatura.archivio.tutti()) u.aggiornato = Date.now() - 40 * GIORNO;
+  const vera = await iscriviSu(baseSpazz, '198.51.100.11', 'Persona');
+  p('un posto occupato da spazzatura si libera per una persona vera',
+    vera.status === 200, vera.status);
+  p('e la spazzatura e\' sparita davvero',
+    !conSpazzatura.archivio.utente('Finto1') && !conSpazzatura.archivio.utente('Finto2'),
+    conSpazzatura.archivio.tutti().map((u) => u.nick));
+  await conSpazzatura.chiudi();
+
+  /* Il giro periodico fa la stessa pulizia senza aspettare che qualcuno si
+   * iscriva: un archivio che nessuno guarda non deve gonfiarsi lo stesso. */
+  const conGiro = conTetto({ archivio: path.join(tmp, 'utenti-giro.json') });
+  const baseGiro = 'http://127.0.0.1:' + (await conGiro.apri());
+  await iscriviSu(baseGiro, '198.51.100.12', 'Vecchio');
+  await iscriviSu(baseGiro, '198.51.100.12', 'Nuovo');
+  conGiro.archivio.utente('Vecchio').aggiornato = Date.now() - 40 * GIORNO;
+  await conGiro.giro(Date.now());
+  p('il giro toglie l\'abbandonato', !conGiro.archivio.utente('Vecchio'));
+  p('e lascia stare chi e\' arrivato adesso', !!conGiro.archivio.utente('Nuovo'));
+  await conGiro.chiudi();
+
+  gruppo('Limite di frequenza dietro un proxy');
+  const dietro = avvia({
+    porta: 0,
+    archivio: path.join(tmp, 'utenti-proxy.json'),
+    chiavi: Push.generaChiavi(),
+    senzaTimer: true,
+    dietroProxy: true,
+    invia: async () => ({ stato: 201 }),
+  });
+  const portaD = await dietro.apri();
+  const baseD = 'http://127.0.0.1:' + portaD;
+  const bussa = (ipFinto) => fetch(baseD + '/api/chiave', { headers: { 'Fly-Client-IP': ipFinto } });
+
+  let fermato = false;
+  for (let i = 0; i < 70; i++) {
+    if ((await bussa('203.0.113.7')).status === 429) { fermato = true; break; }
+  }
+  p('un indirizzo rumoroso viene fermato', fermato);
+  /* L'asserzione che conta: senza la correzione questa e' 429, perche' le due
+   * richieste finiscono nello stesso secchio - quello del socket. */
+  const altro = await bussa('203.0.113.99');
+  p('un altro indirizzo non paga per lui', altro.status === 200, altro.status);
+  await dietro.chiudi();
+
   gruppo('Limite di frequenza');
   let bloccato = false;
   for (let i = 0; i < 80; i++) {
@@ -163,6 +361,14 @@ const ISCRIZIONE = {
     if (rr.stato === 429) { bloccato = true; break; }
   }
   p('oltre sessanta richieste al minuto si viene fermati', bloccato);
+
+  /* Qui il secchio del socket e' esaurito. Un'intestazione Fly-Client-IP mai
+   * vista deve restare 429: se aprisse un secchio nuovo, chiunque salterebbe
+   * il limite scrivendosi un indirizzo diverso a ogni richiesta. Senza
+   * `dietroProxy` l'intestazione non si guarda, ed e' il punto. */
+  const finto = await fetch(base + '/api/chiave', { headers: { 'Fly-Client-IP': '198.51.100.1' } });
+  p('senza proxy dichiarato l\'intestazione non fa saltare il limite',
+    finto.status === 429, finto.status);
 
   await app.chiudi();
   fs.rmSync(tmp, { recursive: true, force: true });

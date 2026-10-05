@@ -3,13 +3,24 @@
  * questa rete, lo dice invece di fingere che sia andata bene. */
 'use strict';
 const { chromium } = require('playwright');
+const fs = require('fs');
+
+/* Questa prova e' fatta apposta per girare altrove: dove il server sara'
+ * ospitato, contro l'indirizzo vero. Il percorso di Chromium era scritto a
+ * mano e valeva solo dentro il contenitore in cui e' nata - cioe' l'unico
+ * posto in cui questa prova non serve a niente. Stesso schema di
+ * test/e2e.js. */
+function doveSta() {
+  if (process.env.CHROME) return { executablePath: process.env.CHROME };
+  const proprio = '/opt/pw-browsers/chromium-1194/chrome-linux/chrome';
+  if (fs.existsSync(proprio)) return { executablePath: proprio };
+  return {};   // se lo trova Playwright
+}
 
 (async () => {
   const BASE = process.env.BASE || 'http://127.0.0.1:8899';
-  const b = await chromium.launch({
-    executablePath: '/opt/pw-browsers/chromium-1194/chrome-linux/chrome',
-    args: ['--enable-features=PushMessaging'],
-  });
+  const b = await chromium.launch(Object.assign(
+    { args: ['--enable-features=PushMessaging'] }, doveSta()));
   const ctx = await b.newContext({ permissions: ['notifications'] });
   const p = await ctx.newPage();
   await p.goto(BASE + '/index.html', { waitUntil: 'networkidle' });
